@@ -1,2 +1,5 @@
 .venv/*
 .venv/
+bokeh_calib_photos/*
+bokeh_calib_photos/
+stacks/*

@@ -2,8 +2,12 @@ import cv2 as cv
 import cv2.aruco as ac
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 def gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radius, true_dot_spacing):
+    """
+    Generates a calibration image and saves it to `calib_images/`
+    """
     true_width = 210
     
     marker_dict = ac.getPredefinedDictionary(ac.DICT_5X5_50)
@@ -45,13 +49,16 @@ def gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radi
     marker_spacing = int((dest_width - 2*marker_padding)/3)
     marker_expand = int(marker_size/7)
     marker_outer_size = int(marker_size + 2*marker_expand)
+    
+    markers = []
 
     w_markers = (dest_width - 2*marker_padding)//marker_spacing + 1
     h_markers = (dest_height - 2*marker_padding)//marker_spacing + 1
     for x in range(w_markers):
         for y in range(h_markers):
+            marker_id = x + y*w_markers
             marker = np.zeros((marker_size, marker_size), dtype=np.uint8)
-            ac.generateImageMarker(marker_dict, x + y*w_markers, marker_size, marker)
+            ac.generateImageMarker(marker_dict, marker_id, marker_size, marker)
             padded_marker = np.full((marker_outer_size, marker_outer_size), 255, dtype=np.uint8)
             padded_marker[marker_expand:marker_size + marker_expand, marker_expand:marker_size + marker_expand] = marker
             
@@ -63,8 +70,12 @@ def gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radi
             b = a + e - s
             
             calib_image[s[0]:e[0], s[1]:e[1]] = padded_marker[a[0]:b[0], a[1]:b[1]]
+            markers.append({"id":int(marker_id), "origin":[int(marker_pos[1]), int(marker_pos[0])], "size":int(marker_outer_size)})
 
-    cv.imwrite(f"./calib_images/calib_or{true_dot_outer_radius}_ir{true_dot_inner_radius}_ds{true_dot_spacing}.png", calib_image)
+    filename = f"calib_or{true_dot_outer_radius}_ir{true_dot_inner_radius}_ds{true_dot_spacing}"
+    cv.imwrite(f"./calib_images/{filename}.png", calib_image)
+    with open(f"./calib_images/{filename}.json", 'w') as f:
+        json.dump(markers, f, indent=4)
 
 gen_calib_image(15, 15, 7, 40)
 gen_calib_image(15, 15, 0, 40)
