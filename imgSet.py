@@ -1,11 +1,12 @@
 import cv2 as cv
 import cv2.aruco as ac
-import matplotlib.pyplot as plt
 import rawpy
 import exiv2
 import numpy as np
+import numpy.linalg as la
 import json
-from scipy.ndimage import convolve
+# todo: remove
+import matplotlib.pyplot as plt
 
 class imgSet:
     def __init__(self, set_id, start, in_focus, end):
@@ -14,9 +15,9 @@ class imgSet:
         self.in_focus = in_focus - start
         self.count = end - start
         
-    def read_img(self, idx):
+    def read_meta(self, idx):
         """
-        Returns an image in the image set and its exif metadata
+        Returns an image's exif metadata
         """
         if (0 > idx or idx >= self.count):
             raise ValueError("Index out of range for image set")
@@ -26,9 +27,20 @@ class imgSet:
         meta_img = exiv2.ImageFactory.open(path)
         meta_img.readMetadata()
         meta = meta_img.exifData()
+    
+        return meta
+        
+    def read_img(self, idx):
+        """
+        Returns an image in the image set
+        """
+        if (0 > idx or idx >= self.count):
+            raise ValueError("Index out of range for image set")
+        
+        path = f"./bokeh_calib_photos/{self.id}/IMG_{self.start + idx}.CR3"
         
         img = rawpy.imread(path)
-        return (img.postprocess(), meta)
+        return img.postprocess()
     
     def read_gt(self):
         """
@@ -42,18 +54,17 @@ class imgSet:
         """
         return np.load(f"./stacks/{self.id}.npy")
     
-    def calc_pose(self):
+    def calc_homography(self):
         """
-        Returns the orientation of the imaged plane with respect to the camera as a 3x4 affine matrix
+        Returns the orientation of the imaged plane with respect to the camera as a 3x3 homography matrix
         """
         # locate aruco patches
         
-        img, meta = self.read_img(self.in_focus)
+        img = self.read_img(self.in_focus)
         gt_img = self.read_gt()
         
         detector = ac.ArucoDetector(ac.getPredefinedDictionary(ac.DICT_5X5_50))
         rects, ids, _ = detector.detectMarkers(img)
-        plt.imshow(img)
         
         # find homography between real image and calibration image
         
@@ -73,14 +84,13 @@ class imgSet:
         
         # debugging display
         alpha = 0.5
-        hmat, _ = cv.findHomography(src_points, dst_points)
-        warped = cv.warpPerspective(gt_img, hmat, (img.shape[1], img.shape[0]))
-        warped_alpha = cv.warpPerspective(np.full((gt_img.shape[0], gt_img.shape[1]), alpha, dtype=np.float32), hmat, (img.shape[1], img.shape[0]))
-        plt.imshow((warped*warped_alpha[:,:,None] + img*(1 - warped_alpha)[:,:,None])/255)
-        plt.show()
+        H, _ = cv.findHomography(src_points, dst_points)
+        #warped = cv.warpPerspective(gt_img, H, (img.shape[1], img.shape[0]))
+        #warped_alpha = cv.warpPerspective(np.full((gt_img.shape[0], gt_img.shape[1]), alpha, dtype=np.float32), H, (img.shape[1], img.shape[0]))
+        #plt.imshow((warped*warped_alpha[:,:,None] + img*(1 - warped_alpha)[:,:,None])/255)
+        #plt.show()
         
-        # figure out how to convert from 3x3 homography matrix + focus distance to 3x4 affine matrix
-        pass
+        return H
 
 img_sets = {
     "or6_ir0_ds20": imgSet("or6_ir0_ds20", 9575, 9625, 9646),
@@ -90,48 +100,8 @@ img_sets = {
     "or10_ir2_ds20": imgSet("or10_ir2_ds20", 9287, 9337, 9358),
     "or10_ir5_ds30": imgSet("or10_ir5_ds30", 9215, 9265, 9286),
     "or15_ir0_ds40": imgSet("or15_ir0_ds40", 9143, 9193, 9214),
-    "or15_ir7_ds40": imgSet("or15_ir7_ds40", 9071, 9121, 9142)
+    "or15_ir7_ds40": imgSet("or15_ir7_ds40", 9071, 9121, 9142),
+    #"50_test": imgSet("50_test", 8327, 8327, 8367)
 }
 
-def gen_stack(set_id):
-    img_set = img_sets[set_id]
-    first, _ = img_set.read_img(0)
-    stack = np.empty((img_set.count, first.shape[0], first.shape[1]), dtype=first.dtype)
-    for i in range(img_set.count):
-        img, _ = img_set.read_img(i)
-        stack[i] = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    np.save(f"./stacks/{img_set.id}.npy", stack)
-    print(f"done stack for {img_set.id}")
-
-# run this at some point before using imgSet.get_stack
-def gen_stacks():
-    #gen_stack("or6_ir0_ds20"),
-    gen_stack("or6_ir3_ds20"),
-    gen_stack("or10_ir0_ds30"),
-    gen_stack("or10_ir1_ds20"),
-    gen_stack("or10_ir2_ds20"),
-    gen_stack("or10_ir5_ds30"),
-    gen_stack("or15_ir0_ds40"),
-    gen_stack("or15_ir7_ds40")
-
-        
-gen_stacks()
-
 #img_sets["or6_ir0_ds20"].calc_pose()
-
-sobel3d = [
-    [[ 1, 2, 1],
-     [ 2, 4, 2],
-     [ 1, 2, 1]],
-    [[ 0, 0, 0],
-     [ 0, 0, 0],
-     [ 0, 0, 0]],
-    [[-1,-2,-1],
-     [-2,-4,-2],
-     [-1,-2,-1]]
-]
-
-stack = img_sets["or6_ir0_ds20"].get_stack()
-dIdfocus = convolve(stack, sobel3d, mode='constant', cval=0.0, axes=(0,1,2))
-plt.imshow(dIdfocus[20])
-plt.show()
