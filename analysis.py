@@ -1,9 +1,8 @@
-from imgSet import img_sets
+from imgSet import bokeh_img_sets
 from scipy.ndimage import convolve
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Slider
-import ipdb
 import scipy.optimize as opt
 
 def disp_slices(slices):
@@ -76,12 +75,14 @@ sobel3d = [
      [-1,-2,-1]]
 ]
 
-#disp_focus_depth(img_sets["or6_ir0_ds20"])
+if __name__ == "__main__":
 
-#for img_set in img_sets.values():
-#    fmin, fmax = get_depths(img_set)
-#    plt.plot(fmin)
-#plt.show()
+    disp_focus_depth(bokeh_img_sets["or6_ir0_ds20"])
+
+    for img_set in bokeh_img_sets.values():
+        fmin, fmax = get_depths(img_set)
+        plt.plot(fmin)
+        plt.show()
 
 #stack = img_sets["or6_ir0_ds20"].get_stack()
 #derivative_focus = convolve(np.float32(stack), sobel3d, mode='constant', cval=0.0, axes=(0,1,2))

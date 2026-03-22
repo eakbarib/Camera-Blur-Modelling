@@ -9,12 +9,13 @@ import json
 import matplotlib.pyplot as plt
 
 class imgSet:
-    def __init__(self, set_id, start, in_focus, end):
+    def __init__(self,folder, set_id, start, in_focus, end):
         self.id = set_id
         self.start = start
         self.in_focus = in_focus - start
         self.count = end - start
-        
+        self.folder = folder
+
     def read_meta(self, idx):
         """
         Returns an image's exif metadata
@@ -22,7 +23,7 @@ class imgSet:
         if (0 > idx or idx >= self.count):
             raise ValueError("Index out of range for image set")
         
-        path = f"./bokeh_calib_photos/{self.id}/IMG_{self.start + idx}.CR3"
+        path = f"{self.folder}/{self.id}/IMG_{self.start + idx:04d}.CR3"
         
         meta_img = exiv2.ImageFactory.open(path)
         meta_img.readMetadata()
@@ -37,7 +38,7 @@ class imgSet:
         if (0 > idx or idx >= self.count):
             raise ValueError("Index out of range for image set")
         
-        path = f"./bokeh_calib_photos/{self.id}/IMG_{self.start + idx}.CR3"
+        path = f"{self.folder}/{self.id}/IMG_{self.start + idx:04d}.CR3"
         
         img = rawpy.imread(path)
         return img.postprocess()
@@ -92,16 +93,50 @@ class imgSet:
         
         return H
 
-img_sets = {
-    "or6_ir0_ds20": imgSet("or6_ir0_ds20", 9575, 9625, 9646),
-    "or6_ir3_ds20": imgSet("or6_ir3_ds20", 9503, 9553, 9574),
-    "or10_ir0_ds30": imgSet("or10_ir0_ds30", 9431, 9481, 9502),
-    "or10_ir1_ds20": imgSet("or10_ir1_ds20", 9359, 9409, 9430),
-    "or10_ir2_ds20": imgSet("or10_ir2_ds20", 9287, 9337, 9358),
-    "or10_ir5_ds30": imgSet("or10_ir5_ds30", 9215, 9265, 9286),
-    "or15_ir0_ds40": imgSet("or15_ir0_ds40", 9143, 9193, 9214),
-    "or15_ir7_ds40": imgSet("or15_ir7_ds40", 9071, 9121, 9142),
+bokeh_img_sets = {
+    "or1_ir0_ds20":imgSet("./bokeh_calib_photos","or1_ir0_ds20",996 , 1018, 1035),
+    "or6_ir0_ds20": imgSet("./bokeh_calib_photos","or6_ir0_ds20", 1036, 1058, 1074),
+    "or6_ir3_ds20": imgSet("./bokeh_calib_photos","or6_ir3_ds20", 1075, 1099, 1114),
+    "or10_ir0_ds30": imgSet("./bokeh_calib_photos","or10_ir0_ds30", 1115, 1137, 1154),
+    "or10_ir1_ds20": imgSet("./bokeh_calib_photos","or10_ir1_ds20", 1155, 1177, 1194),
+    "or10_ir2_ds20": imgSet("./bokeh_calib_photos","or10_ir2_ds20", 1195, 1217, 1234),
+    "or10_ir5_ds30": imgSet("./bokeh_calib_photos","or10_ir5_ds30", 1235, 1257, 1274),
+    "or15_ir0_ds40": imgSet("./bokeh_calib_photos","or15_ir0_ds40", 1275, 1297, 1314),
+    "or15_ir7_ds40": imgSet("./bokeh_calib_photos","or15_ir7_ds40", 1315, 1337, 1354),
     #"50_test": imgSet("50_test", 8327, 8327, 8367)
+}
+
+checkerboard_img_sets = {
+    1:imgSet("./checkerboard_images", "1", 1, 7, 19),
+    2:imgSet("./checkerboard_images", "2", 20, 47, 59),
+    3:imgSet("./checkerboard_images", "3", 60, 92, 100),
+    4:imgSet("./checkerboard_images", "4", 101, 131, 141),
+    5:imgSet("./checkerboard_images", "5", 142, 160, 182),
+    6:imgSet("./checkerboard_images", "6", 183, 207, 223),
+    7:imgSet("./checkerboard_images", "7", 306, 328, 346),
+    8:imgSet("./checkerboard_images", "8", 388, 410, 428),
+    9:imgSet("./checkerboard_images", "9", 429, 448, 469),
+    10:imgSet("./checkerboard_images", "10", 470, 496, 510),
+    11:imgSet("./checkerboard_images", "11", 511, 533, 551),
+    12:imgSet("./checkerboard_images", "12", 552, 576, 592),
+    13:imgSet("./checkerboard_images", "13", 593, 617, 633),
+    14:imgSet("./checkerboard_images", "14", 634, 653, 674),
+    15:imgSet("./checkerboard_images", "15", 675, 694, 715),
+    16:imgSet("./checkerboard_images", "16", 716, 740, 755),
+    17:imgSet("./checkerboard_images", "17", 756, 780, 795),
+    18:imgSet("./checkerboard_images", "18", 796, 819, 835),
+    19:imgSet("./checkerboard_images", "19", 836, 860, 875),
+    20:imgSet("./checkerboard_images", "20", 916, 937, 955),
+    21:imgSet("./checkerboard_images", "21", 956, 977, 995),
+    22:imgSet("./checkerboard_images", "22", 8533, 8554, 8572),
+    23:imgSet("./checkerboard_images", "23", 8586, 8594, 8613),
+    24:imgSet("./checkerboard_images", "24", 8654, 8670, 8693),
+    25:imgSet("./checkerboard_images", "25", 8694, 8713, 8733),
+    26:imgSet("./checkerboard_images", "26", 8734, 8753, 8773),
+    27:imgSet("./checkerboard_images", "27", 8774, 8793, 8813),
+    28:imgSet("./checkerboard_images", "28", 8814, 8835, 8853),
+    29:imgSet("./checkerboard_images", "29", 8854, 8873, 8893),
+    30:imgSet("./checkerboard_images", "30", 8894, 8913, 8933),
 }
 
 #img_sets["or6_ir0_ds20"].calc_pose()
