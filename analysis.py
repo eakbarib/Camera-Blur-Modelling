@@ -45,6 +45,10 @@ def get_depths(img_set):
         fmin[i] = meta["Exif.CanonFi.FocusDistanceLower"].getValue().toFloat()
         fmax[i] = meta["Exif.CanonFi.FocusDistanceUpper"].getValue().toFloat()
     return (fmin, fmax)
+
+def get_depth(img_set, idx):
+    fmin, fmax = get_depths(img_set)
+    return (fmin[idx] + fmax[idx]) / 2.0
     
 def disp_focus_depth(img_set):
     fmin = np.empty(img_set.count)

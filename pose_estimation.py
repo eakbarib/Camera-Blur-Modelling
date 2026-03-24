@@ -2,7 +2,6 @@ import os
 import cv2
 import numpy as np
 import json
-import rawpy
 from imgSet import bokeh_img_sets
 from analysis import get_depths
 
@@ -36,6 +35,9 @@ def generate_3d_from_json(detected_ids, json_path, meters_per_pixel):
         # Convert pixels to physical meters!
         center_x = (px_x + (px_size / 2.0)) * meters_per_pixel
         center_y = (px_y + (px_size / 2.0)) * meters_per_pixel
+        # --- THE FIX: SHIFT THE ORIGIN TO THE DEAD CENTER OF THE A4 PAPER ---
+        center_x -= 0.105   # Half of 0.210m width
+        center_y -= 0.1485  # Half of 0.297m height
         half_size = (px_size / 2.0) * meters_per_pixel
         center_z = 0.0
         
@@ -151,19 +153,17 @@ if __name__ == "__main__":
             print(f"Calibration JSON not found for closest depth {closest_depth}: {json_path}")
             continue
 
-        # Load K and D
+       # Load K and D
         with open(json_path, 'r') as f:
             calib = json.load(f)
         K = np.array(calib["camera_matrix"])
         D = np.array(calib["distortion_coefficients"])
 
-        # Undistort image
-        undistorted = cv2.undistort(sharp_img, K, D)
-
-        # Find ArUco marker corners
-        corners, ids = find_calib_photo_corners(undistorted)
+        # FIX: Find ArUco markers directly on the RAW, Distorted image!
+        corners, ids = find_calib_photo_corners(sharp_img) 
+        
         if corners is None or ids is None:
-            print(f"No ArUco markers found in undistorted image for {set_key}")
+            print(f"No ArUco markers found in raw image for {set_key}")
             continue
 
         # Generate 3D object points from JSON layout
@@ -175,8 +175,9 @@ if __name__ == "__main__":
         # Flatten corners to match objpoints format
         imgpoints = np.array(corners).reshape(-1, 2).astype(np.float32)
 
-        # Solve PnP
+        # FIX: Solve PnP with the raw points, letting OpenCV handle the D math internally
         T = solve_pnp(objpoints, imgpoints, K, D)
+        
         if T is None:
             print(f"PnP failed for {set_key}")
             continue
