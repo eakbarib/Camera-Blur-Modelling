@@ -4,6 +4,5 @@ bokeh_calib_photos/*
 bokeh_calib_photos/
 checkerboard_images
 checkerboard_images/*
-depth_groups/*
-depth_groups/
+*.CR3   
 stacks/*
