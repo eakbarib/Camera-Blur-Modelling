@@ -8,9 +8,11 @@ class Camera(mi.Sensor):
     def __init__(self, props):
         """
         Props:
-            fx: x focal length (in normalized coords)
-            fy: y focal length (in normalized coords)
-            cx: 
+            'camera_matrix' _ScalarMatrix3f_: camera matrix from opencv
+            'distortion_coefficents' _List<Float>_: coefficents from opencv
+            'aperture_radius' _Float_
+            'focus_distance' _Float_
+            & inherited sensor props
         """
         super().__init__(props)
         
