@@ -4,5 +4,7 @@ bokeh_calib_photos/*
 bokeh_calib_photos/
 checkerboard_images
 checkerboard_images/*
-*.CR3   
+*.CR3
 stacks/*
+__pycache__/*
+__pycache__/

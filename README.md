@@ -69,7 +69,7 @@ Calibrating camera + lens depth of field blur using Mitsuba renderer for simulat
 
 ## Setup
 
-1. Create a virtual environment:
+1. Create and enter virtual environment:
    ```
    py -m venv .venv
    .venv/Scripts/activate
@@ -84,6 +84,7 @@ Calibrating camera + lens depth of field blur using Mitsuba renderer for simulat
    - Download and install Mitsuba 3 from https://www.mitsuba-renderer.org/
    - Ensure Mitsuba Python bindings are available in your environment
    - The script uses CUDA variant (`cuda_ad_rgb`), so CUDA-compatible GPU is recommended
+   - note: installing requirements.txt should install mitsuba automatically
 
 4. Place calibration data:
    - Put bokeh calibration photos in `/bokeh_calib_photos`
@@ -97,7 +98,8 @@ Calibrating camera + lens depth of field blur using Mitsuba renderer for simulat
    ```
    This creates `depth_groups/` with images organized by focus depth.
 
-2. **Calibrate camera at each depth**:
+2. **Calibrate camera at each depth** (if not already done):
+   Do not run if you don't have to.
    ```
    python calibrate_depths.py
    ```
