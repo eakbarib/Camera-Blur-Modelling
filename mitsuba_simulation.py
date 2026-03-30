@@ -18,6 +18,9 @@ def load_first_pose(pose_file):
     matrix = poses[first_key]['transformation_matrix']
     return np.array(matrix).flatten().tolist(), first_key
 
+def load_base_calib():
+    """Loads the in-focus calibration for an image set"""
+
 def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
     """Create Mitsuba scene dictionary"""
     

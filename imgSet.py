@@ -5,11 +5,11 @@ import exiv2
 import numpy as np
 import numpy.linalg as la
 import json
-# todo: remove
-import matplotlib.pyplot as plt
+import os
+from depthGroup import depth_groups
 
 class imgSet:
-    def __init__(self,folder, set_id, start, in_focus, end):
+    def __init__(self, folder, set_id, start, in_focus, end):
         self.id = set_id
         self.start = start
         self.in_focus = in_focus - start
@@ -30,6 +30,17 @@ class imgSet:
         meta = meta_img.exifData()
     
         return meta
+    
+    def get_focus_distance_range(self, idx):
+        """
+        Returns a tuple of the min and max focus distances for an image
+        """
+        fmin = np.empty(self.count)
+        fmax = np.empty(self.count)
+        meta = self.read_meta(idx)
+        fmin = meta["Exif.CanonFi.FocusDistanceLower"].getValue().toFloat()
+        fmax = meta["Exif.CanonFi.FocusDistanceUpper"].getValue().toFloat()
+        return (fmin, fmax)
         
     def read_img(self, idx):
         """
@@ -48,6 +59,29 @@ class imgSet:
         Returns the calibration image used for this image set
         """
         return cv.imread(f"./calib_images/calib_{self.id}.png")
+    
+    def get_pose(self):
+        """
+        Returns the pose for this image set
+        """
+        with open('pose_estimations.json', 'r') as f:
+            poses = json.load(f)
+        return poses["id"]
+        
+    def get_calib(self, idx):
+        """
+        Returns the camera calibration for the depth of an image
+        """
+        low, high = self.get_focus_distance_range(idx)
+        target_depth = round((low + high)*0.5, 0)
+        
+        # Find closest depth
+        closest_depth = min(depth_groups, key=lambda depth_group: abs(depth_group.depth - target_depth))
+        
+        if closest_depth == None:
+            print(f"No calibration found for nearest depth to {target_depth}, ({closest_depth.depth})")
+            return None
+        return closest_depth.depth
     
     def get_stack(self):
         """
@@ -94,16 +128,15 @@ class imgSet:
         return H
 
 bokeh_img_sets = {
-    "or1_ir0_ds20":imgSet("./bokeh_calib_photos","or1_ir0_ds20",996 , 1018, 1035),
-    "or6_ir0_ds20": imgSet("./bokeh_calib_photos","or6_ir0_ds20", 1036, 1058, 1074),
-    "or6_ir3_ds20": imgSet("./bokeh_calib_photos","or6_ir3_ds20", 1075, 1099, 1114),
-    "or10_ir0_ds30": imgSet("./bokeh_calib_photos","or10_ir0_ds30", 1115, 1137, 1154),
-    "or10_ir1_ds20": imgSet("./bokeh_calib_photos","or10_ir1_ds20", 1155, 1177, 1194),
-    "or10_ir2_ds20": imgSet("./bokeh_calib_photos","or10_ir2_ds20", 1195, 1217, 1234),
-    "or10_ir5_ds30": imgSet("./bokeh_calib_photos","or10_ir5_ds30", 1235, 1257, 1274),
-    "or15_ir0_ds40": imgSet("./bokeh_calib_photos","or15_ir0_ds40", 1275, 1297, 1314),
-    "or15_ir7_ds40": imgSet("./bokeh_calib_photos","or15_ir7_ds40", 1315, 1337, 1354),
-    #"50_test": imgSet("50_test", 8327, 8327, 8367)
+    "or1_ir0_ds20":imgSet("./bokeh_calib_photos", "or1_ir0_ds20", 996, 1018, 1035),
+    "or6_ir0_ds20": imgSet("./bokeh_calib_photos", "or6_ir0_ds20", 1036, 1058, 1074),
+    "or6_ir3_ds20": imgSet("./bokeh_calib_photos", "or6_ir3_ds20", 1075, 1099, 1114),
+    "or10_ir0_ds30": imgSet("./bokeh_calib_photos", "or10_ir0_ds30", 1115, 1137, 1154),
+    "or10_ir1_ds20": imgSet("./bokeh_calib_photos", "or10_ir1_ds20", 1155, 1177, 1194),
+    "or10_ir2_ds20": imgSet("./bokeh_calib_photos", "or10_ir2_ds20", 1195, 1217, 1234),
+    "or10_ir5_ds30": imgSet("./bokeh_calib_photos", "or10_ir5_ds30", 1235, 1257, 1274),
+    "or15_ir0_ds40": imgSet("./bokeh_calib_photos", "or15_ir0_ds40", 1275, 1297, 1314),
+    "or15_ir7_ds40": imgSet("./bokeh_calib_photos", "or15_ir7_ds40", 1315, 1337, 1354),
 }
 
 checkerboard_img_sets = {
