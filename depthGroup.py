@@ -5,7 +5,11 @@ import rawpy
 class depthGroup:
     def __init__(self, folder):
         self.folder = folder
-        self.depth = float(folder.split("_")[1])
+        try:
+            self.depth = float(folder.split("_")[1])
+        except ValueError:
+            self = None
+            return
         
         calib_path = os.path.join(folder, "calib.json")
         self.calibration = None
@@ -15,11 +19,11 @@ class depthGroup:
              
         self.count = sum(1 for filename in os.listdir(folder) if filename.endswith(".CR3"))
     
-    def __init__(self, folder, depth, count, calibration=None):
-        self.folder = folder
-        self.depth = depth
-        self.count = count
-        self.calibration = calibration
+    #def __init__(self, folder, depth, count, calibration=None):
+    #    self.folder = folder
+    #    self.depth = depth
+    #    self.count = count
+    #    self.calibration = calibration
         
     def read_img(self, idx):
         """_summary_
@@ -37,9 +41,8 @@ depth_groups = []
 if os.path.exists("depth_groups"):
     for folder in os.listdir("depth_groups"):
         if folder.startswith("depth_"):
-            try:
-                depth_groups.append(depthGroup(folder))
-            except ValueError:
-                continue
+            group = depthGroup(os.path.join("depth_groups", folder))
+            if group:
+                depth_groups.append(group)
 if not depth_groups:
     print(f"No depth folders found in depth_groups, please generate depth groups first.")

@@ -9,18 +9,6 @@ from imgSet import bokeh_img_sets
 # Set Mitsuba variant
 mi.set_variant('cuda_ad_rgb')
 
-def load_first_pose(pose_file):
-    """Load the first transformation matrix from pose_estimations.json"""
-    with open(pose_file, 'r') as f:
-        poses = json.load(f)
-
-    first_key = next(iter(poses))
-    matrix = poses[first_key]['transformation_matrix']
-    return np.array(matrix).flatten().tolist(), first_key
-
-def load_base_calib():
-    """Loads the in-focus calibration for an image set"""
-
 def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
     """Create Mitsuba scene dictionary"""
     
@@ -96,26 +84,23 @@ def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
     return scene_dict
 
 def main():
-    pose_file = 'pose_estimations.json'
-    calib_images_dir = 'calib_images'
-
-    # Load first pose
-    matrix, imgset_id = load_first_pose(pose_file)
-    print(f"Using pose from {imgset_id}")
-
-    # Find corresponding calib image
-    calib_image_path = os.path.join(calib_images_dir, f'calib_{imgset_id}.png')
-    if not os.path.exists(calib_image_path):
-        print(f"Calib image not found: {calib_image_path}")
-        return
+    img_set = list(bokeh_img_sets.values())[0]
+    
+    pose = img_set.get_pose()
+    pose_matrix = np.array(pose['transformation_matrix']).flatten().tolist()
+    
+    calib_img_path = img_set.get_gt_path()
+    
+    depth_min, depth_max = img_set.get_focus_distance_range(img_set.in_focus)
+    depth = (depth_min + depth_max)*0.5
 
     # Create scene
-    scene_dict = create_mitsuba_scene(matrix, calib_image_path,get_fov(get_depth(bokeh_img_sets[imgset_id], 15))[0], get_depth(bokeh_img_sets[imgset_id], 15))
+    scene_dict = create_mitsuba_scene(pose_matrix, calib_img_path, get_fov(depth)[0], depth)
     scene = mi.load_dict(scene_dict)
 
     # Render
     print("Rendering scene...")
-    image = mi.render(scene, spp=64)  # 64 samples per pixel
+    image = mi.render(scene, spp=64)  # 128 samples per pixel
 
     # Save image
     mi.util.write_bitmap('rendered_scene.png', image)

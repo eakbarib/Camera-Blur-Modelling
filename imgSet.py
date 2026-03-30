@@ -54,11 +54,17 @@ class imgSet:
         img = rawpy.imread(path)
         return img.postprocess()
     
+    def get_gt_path(self):
+        """
+        Returns the path to the calibration image used for this image set
+        """
+        return f"./calib_images/calib_{self.id}.png"
+    
     def read_gt(self):
         """
         Returns the calibration image used for this image set
         """
-        return cv.imread(f"./calib_images/calib_{self.id}.png")
+        return cv.imread(self.get_gt_path())
     
     def get_pose(self):
         """
@@ -66,7 +72,7 @@ class imgSet:
         """
         with open('pose_estimations.json', 'r') as f:
             poses = json.load(f)
-        return poses["id"]
+        return poses[self.id]
         
     def get_calib(self, idx):
         """
