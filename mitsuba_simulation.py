@@ -1,33 +1,17 @@
 import mitsuba as mi
+mi.set_variant('cuda_ad_rgb')
+
 import numpy as np
 from imgSet import bokeh_img_sets
 import matplotlib.pyplot as plt
 import Camera
 
-# Set Mitsuba variant
-mi.set_variant('cuda_ad_rgb')
-
-def create_mitsuba_scene(pose_matrix, calib_image_path, cam_mat, distortion, focus_distance, render_size):
+def create_mitsuba_scene(cam_pose, calib_image_path, cam_mat, distortion, focus_distance, render_size):
     """Create Mitsuba scene dictionary"""
-    
-    # 1. Convert OpenCV World-to-Camera to Camera-to-World
-    T_cv_w2c = np.array(pose_matrix).reshape(4, 4)
-    T_cv_c2w = np.linalg.inv(T_cv_w2c)
-    
-    # 2. Fix the Coordinate System Flip (OpenCV -> Mitsuba)
-    # Mitsuba's camera looks down +Z, Y-up, X-left. 
-    # We flip the local X and Y axes to match.
-    flip_xy = np.diag([-1.0, -1.0, 1.0, 1.0])
-    T_mi_c2w = T_cv_c2w @ flip_xy
-    
-    #print(distortion)
-    
-    print(f"Final Mitsuba Camera-to-World Matrix:\n{T_mi_c2w}")
     
     scene_dict = {
         'type': 'scene',
         
-        # Changed key from 'camera' to 'sensor' (Mitsuba standard)
         'sensor': {
             'type': 'distorted_camera',
             'fx': cam_mat[0,0],
@@ -41,16 +25,15 @@ def create_mitsuba_scene(pose_matrix, calib_image_path, cam_mat, distortion, foc
             'k3': distortion[4],
             'aperture_radius': 0.00268,
             'focus_distance': focus_distance / 100.0,
-            
-            # Apply the Extrinsics to the Camera, not the plane!
-            'to_world': mi.ScalarTransform4f(T_mi_c2w.tolist()),
+
+            'to_world': mi.ScalarTransform4f(cam_pose.tolist()),
             
             'film': {
                 'type': 'hdrfilm',
                 'width': render_size[1],
                 'height': render_size[0],
                 'pixel_format': 'rgb',
-                'rfilter': {'type': 'gaussian'} # Always good to explicitly define the filter
+                'rfilter': {'type': 'gaussian'}
             },
             'sampler': {
                 'type': 'independent',
@@ -60,9 +43,7 @@ def create_mitsuba_scene(pose_matrix, calib_image_path, cam_mat, distortion, foc
         
         'calib_board': {
             'type': 'rectangle',
-            # NO translation needed. The rectangle natively sits at (0,0,0)
-            # We just scale it to the exact A4 physical dimensions
-            'to_world': mi.ScalarTransform4f().scale([0.105, 0.1485, 1.0]),
+            'to_world': mi.ScalarTransform4f().scale([0.105, 0.1485, 1.0]), # todo: replace magic numbers with a proper expression
             'bsdf': {
                 'type': 'twosided', 
                 'bsdf': {
@@ -92,10 +73,13 @@ def create_mitsuba_scene(pose_matrix, calib_image_path, cam_mat, distortion, foc
     return scene_dict
 
 def main():
+    # load parameters
     img_set = list(bokeh_img_sets.values())[0]
     
-    pose = img_set.get_pose()
-    pose_matrix = np.array(pose['transformation_matrix']).flatten().tolist()
+    plane_pos = np.array(img_set.get_pose()['transformation_matrix'])
+    cam_pose = np.linalg.inv(plane_pos)
+    # convert from opencv to mitsuba coords
+    cam_pose = cam_pose @ np.diag([-1.0, -1.0, 1.0, 1.0])
     
     calib_img_path = img_set.get_gt_path()
     
@@ -108,17 +92,18 @@ def main():
     photo = img_set.read_img(img_set.in_focus)/255
 
     # Create scene
-    scene_dict = create_mitsuba_scene(pose_matrix, calib_img_path, cam_mat, calib["distortion_coefficients"][0], depth, photo.shape[:2])
+    scene_dict = create_mitsuba_scene(cam_pose, calib_img_path, cam_mat, calib["distortion_coefficients"][0], depth, photo.shape[:2])
     scene = mi.load_dict(scene_dict)
 
     # Render
     print("Rendering scene...")
     image = mi.render(scene, spp=64)  # 64 samples per pixel
     
+    # display result overlayed on gt scene
     plt.imshow((np.array(image) + photo)/2)
     plt.show()
 
-    # Save image
+    # Save result
     mi.util.write_bitmap('rendered_scene.png', image)
     print("Rendered image saved as rendered_scene.png")
 

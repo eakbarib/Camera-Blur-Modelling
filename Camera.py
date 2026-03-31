@@ -1,11 +1,8 @@
 import mitsuba as mi
-mi.set_variant('cuda_ad_rgb')
 import drjit as dr
 
-# todo
 # a mitsuba sensor with a differentible camera matrix and distortion parameters (using the Brown-Conrady distortion model)
 class Camera(mi.Sensor):
-    # note: parameters are in normalized coords
     def __init__(self, props):
         """
         Props:
@@ -44,6 +41,7 @@ class Camera(mi.Sensor):
         y = -(sample_pos.y - self.cy) / self.fy
         
         # apply distortion
+        
         x2 = x**2
         y2 = y**2
         xy = x*y
