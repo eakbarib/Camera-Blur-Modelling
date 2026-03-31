@@ -84,10 +84,10 @@ class imgSet:
         # Find closest depth
         closest_depth = min(depth_groups, key=lambda depth_group: abs(depth_group.depth - target_depth))
         
-        if closest_depth == None:
+        if closest_depth.calibration == {}:
             print(f"No calibration found for nearest depth to {target_depth}, ({closest_depth.depth})")
             return None
-        return closest_depth.depth
+        return closest_depth.calibration
     
     def get_stack(self):
         """

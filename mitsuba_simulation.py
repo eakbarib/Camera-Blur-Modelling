@@ -1,19 +1,17 @@
 import mitsuba as mi
-import json
 import numpy as np
-import os
-from calculate_fov import get_fov
-from analysis import get_depth
 from imgSet import bokeh_img_sets
+import matplotlib.pyplot as plt
+import Camera
 
 # Set Mitsuba variant
 mi.set_variant('cuda_ad_rgb')
 
-def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
+def create_mitsuba_scene(pose_matrix, calib_image_path, cam_mat, distortion, focus_distance, render_size):
     """Create Mitsuba scene dictionary"""
     
     # 1. Convert OpenCV World-to-Camera to Camera-to-World
-    T_cv_w2c = np.array(matrix).reshape(4, 4)
+    T_cv_w2c = np.array(pose_matrix).reshape(4, 4)
     T_cv_c2w = np.linalg.inv(T_cv_w2c)
     
     # 2. Fix the Coordinate System Flip (OpenCV -> Mitsuba)
@@ -22,6 +20,8 @@ def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
     flip_xy = np.diag([-1.0, -1.0, 1.0, 1.0])
     T_mi_c2w = T_cv_c2w @ flip_xy
     
+    #print(distortion)
+    
     print(f"Final Mitsuba Camera-to-World Matrix:\n{T_mi_c2w}")
     
     scene_dict = {
@@ -29,8 +29,16 @@ def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
         
         # Changed key from 'camera' to 'sensor' (Mitsuba standard)
         'sensor': {
-            'type': 'thinlens',
-            'fov': fov,
+            'type': 'distorted_camera',
+            'fx': cam_mat[0,0],
+            'fy': cam_mat[1,1],
+            'cx': cam_mat[0,2],
+            'cy': cam_mat[1,2],
+            'k1': distortion[0],
+            'k2': distortion[1],
+            'p1': distortion[2],
+            'p2': distortion[3],
+            'k3': distortion[4],
             'aperture_radius': 0.00268,
             'focus_distance': focus_distance / 100.0,
             
@@ -39,8 +47,8 @@ def create_mitsuba_scene(matrix, calib_image_path, fov, focus_distance):
             
             'film': {
                 'type': 'hdrfilm',
-                'width': 8192,
-                'height': 5464,
+                'width': render_size[1],
+                'height': render_size[0],
                 'pixel_format': 'rgb',
                 'rfilter': {'type': 'gaussian'} # Always good to explicitly define the filter
             },
@@ -93,14 +101,22 @@ def main():
     
     depth_min, depth_max = img_set.get_focus_distance_range(img_set.in_focus)
     depth = (depth_min + depth_max)*0.5
+    
+    calib = img_set.get_calib(img_set.in_focus)
+    cam_mat = np.array(calib["camera_matrix"])
+    
+    photo = img_set.read_img(img_set.in_focus)/255
 
     # Create scene
-    scene_dict = create_mitsuba_scene(pose_matrix, calib_img_path, get_fov(depth)[0], depth)
+    scene_dict = create_mitsuba_scene(pose_matrix, calib_img_path, cam_mat, calib["distortion_coefficients"][0], depth, photo.shape[:2])
     scene = mi.load_dict(scene_dict)
 
     # Render
     print("Rendering scene...")
-    image = mi.render(scene, spp=64)  # 128 samples per pixel
+    image = mi.render(scene, spp=64)  # 64 samples per pixel
+    
+    plt.imshow((np.array(image) + photo)/2)
+    plt.show()
 
     # Save image
     mi.util.write_bitmap('rendered_scene.png', image)

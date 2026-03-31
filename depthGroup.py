@@ -6,7 +6,7 @@ class depthGroup:
     def __init__(self, folder):
         self.folder = folder
         try:
-            self.depth = float(folder.split("_")[1])
+            self.depth = float(folder.split("_")[-1])
         except ValueError:
             self = None
             return
@@ -18,12 +18,6 @@ class depthGroup:
                 self.calibration = json.load(f)
              
         self.count = sum(1 for filename in os.listdir(folder) if filename.endswith(".CR3"))
-    
-    #def __init__(self, folder, depth, count, calibration=None):
-    #    self.folder = folder
-    #    self.depth = depth
-    #    self.count = count
-    #    self.calibration = calibration
         
     def read_img(self, idx):
         """_summary_
