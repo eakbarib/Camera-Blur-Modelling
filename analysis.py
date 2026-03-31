@@ -1,4 +1,5 @@
 from imgSet import bokeh_img_sets
+from depthGroup import depth_groups
 from scipy.ndimage import convolve
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,27 +68,111 @@ def disp_focus_depth(img_set):
     plt.plot(x, focus_dist_curve(x, *max_params))
     plt.show()
     
-sobel3d = [
-    [[ 1, 2, 1],
-     [ 2, 4, 2],
-     [ 1, 2, 1]],
-    [[ 0, 0, 0],
-     [ 0, 0, 0],
-     [ 0, 0, 0]],
-    [[-1,-2,-1],
-     [-2,-4,-2],
-     [-1,-2,-1]]
-]
+def disp_focus_breathing():
+    sorted_groups = sorted(depth_groups, key=lambda x: x.depth)
+    
+    depth = []
+    fx, fy, cx, cy = [], [], [], []
+    k1, k2, k3, p1, p2 = [], [], [], [], []
+    
+    for group in sorted_groups:
+        calib = group.calibration
+        if calib != {}:
+            depth.append(1/group.depth)
+            mat = np.array(calib["camera_matrix"])
+            fx.append(mat[0,0])
+            fy.append(mat[1,1])
+            cx.append(mat[0,2])
+            cy.append(mat[1,2])
+            dist = calib["distortion_coefficients"][0]
+            k1.append(dist[0])
+            k2.append(dist[1])
+            p1.append(dist[2])
+            p2.append(dist[3])
+            k3.append(dist[4])
+    
+    # --- Figure 1: Camera Matrix Parameters ---
+    fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    
+    # Subplot 1: fx, fy vs depth
+    ax1.plot(depth, fx, marker='o', label='$f_x$')
+    ax1.plot(depth, fy, marker='s', label='$f_y$')
+    ax1.set_title('Focal Length ($f_x, f_y$) vs Inverse Depth')
+    ax1.set_xlabel('Inverse Depth')
+    ax1.set_ylabel('Pixels')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Subplot 2: cx, cy vs depth
+    ax2.plot(depth, cx, marker='o', label='$c_x$')
+    ax2.plot(depth, cy, marker='s', label='$c_y$')
+    ax2.set_title('Principal Point ($c_x, c_y$) vs Inverse Depth')
+    ax2.set_xlabel('Inverse Depth')
+    ax2.set_ylabel('Pixels')
+    ax2.legend()
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.show() # or plt.savefig('camera_matrix.png')
+
+    # --- Figure 2: Distortion Coefficients ---
+    fig2, axs = plt.subplots(2, 2, figsize=(12, 10))
+    
+    # Subplot 1: k1 vs depth
+    axs[0, 0].plot(depth, k1, marker='o', color='blue')
+    axs[0, 0].set_title('Radial Distortion $k_1$ vs Inverse Depth')
+    
+    # Subplot 2: k2 vs depth
+    axs[0, 1].plot(depth, k2, marker='s', color='orange')
+    axs[0, 1].set_title('Radial Distortion $k_2$ vs Inverse Depth')
+
+    # Subplot 3: k3 vs depth
+    axs[1, 0].plot(depth, k3, marker='^', color='green')
+    axs[1, 0].set_title('Radial Distortion $k_3$ vs Inverse Depth')
+
+    # Subplot 4: p1, p2 vs depth
+    axs[1, 1].plot(depth, p1, marker='d', label='$p_1$')
+    axs[1, 1].plot(depth, p2, marker='x', label='$p_2$')
+    axs[1, 1].set_title('Tangential Distortion $p_1, p_2$ vs Inverse Depth')
+    axs[1, 1].legend()
+
+    for ax in axs.flat:
+        ax.set_xlabel('Inverse Depth')
+        ax.set_ylabel('Coefficient Value')
+        ax.grid(True)
+
+    plt.tight_layout()
+    plt.show() # or plt.savefig('distortion.png')
 
 if __name__ == "__main__":
+    # view focus breathing
+    if True:
+        disp_focus_breathing()
+    
+    # view focus derivative
+    if False:
+        sobel3d = [
+            [[ 1, 2, 1],
+            [ 2, 4, 2],
+            [ 1, 2, 1]],
+            [[ 0, 0, 0],
+            [ 0, 0, 0],
+            [ 0, 0, 0]],
+            [[-1,-2,-1],
+            [-2,-4,-2],
+            [-1,-2,-1]]
+        ]
+        
+        stack = bokeh_img_sets["or6_ir0_ds20"].get_stack()
+        derivative_focus = convolve(np.float32(stack), sobel3d, mode='constant', cval=0.0, axes=(0,1,2))
+        disp_slices(derivative_focus)
 
-    disp_focus_depth(bokeh_img_sets["or6_ir0_ds20"])
+    # view depth curves
+    if False:
+        disp_focus_depth(bokeh_img_sets["or6_ir0_ds20"])
 
-    for img_set in bokeh_img_sets.values():
-        fmin, fmax = get_depths(img_set)
-        plt.plot(fmin)
-        plt.show()
+        for img_set in bokeh_img_sets.values():
+            fmin, fmax = get_depths(img_set)
+            plt.plot(fmin)
+            plt.show()
 
-#stack = img_sets["or6_ir0_ds20"].get_stack()
-#derivative_focus = convolve(np.float32(stack), sobel3d, mode='constant', cval=0.0, axes=(0,1,2))
-#disp_slices(derivative_focus)
