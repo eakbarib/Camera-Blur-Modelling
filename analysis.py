@@ -37,19 +37,6 @@ def disp_slices(slices):
     
 def focus_dist_curve(x, a, b, k):
     return k/(x - b) + a
-
-def get_depths(img_set):
-    fmin = np.empty(img_set.count)
-    fmax = np.empty(img_set.count)
-    for i in range(img_set.count):
-        meta = img_set.read_meta(i)
-        fmin[i] = meta["Exif.CanonFi.FocusDistanceLower"].getValue().toFloat()
-        fmax[i] = meta["Exif.CanonFi.FocusDistanceUpper"].getValue().toFloat()
-    return (fmin, fmax)
-
-def get_depth(img_set, idx):
-    fmin, fmax = get_depths(img_set)
-    return (fmin[idx] + fmax[idx]) / 2.0
     
 def disp_focus_depth(img_set):
     fmin = np.empty(img_set.count)
@@ -91,10 +78,10 @@ def disp_focus_breathing():
             p2.append(dist[3])
             k3.append(dist[4])
     
-    # --- Figure 1: Camera Matrix Parameters ---
+    # Figure 1
     fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
     
-    # Subplot 1: fx, fy vs depth
+    # fx, fy vs depth
     ax1.plot(depth, fx, marker='o', label='$f_x$')
     ax1.plot(depth, fy, marker='s', label='$f_y$')
     ax1.set_title('Focal Length ($f_x, f_y$) vs Inverse Depth')
@@ -103,7 +90,7 @@ def disp_focus_breathing():
     ax1.legend()
     ax1.grid(True)
 
-    # Subplot 2: cx, cy vs depth
+    # cx, cy vs depth
     ax2.plot(depth, cx, marker='o', label='$c_x$')
     ax2.plot(depth, cy, marker='s', label='$c_y$')
     ax2.set_title('Principal Point ($c_x, c_y$) vs Inverse Depth')
@@ -113,24 +100,24 @@ def disp_focus_breathing():
     ax2.grid(True)
 
     plt.tight_layout()
-    plt.show() # or plt.savefig('camera_matrix.png')
+    plt.show()
 
-    # --- Figure 2: Distortion Coefficients ---
+    # Figure 2 
     fig2, axs = plt.subplots(2, 2, figsize=(12, 10))
     
-    # Subplot 1: k1 vs depth
+    # k1 vs depth
     axs[0, 0].plot(depth, k1, marker='o', color='blue')
     axs[0, 0].set_title('Radial Distortion $k_1$ vs Inverse Depth')
     
-    # Subplot 2: k2 vs depth
+    # k2 vs depth
     axs[0, 1].plot(depth, k2, marker='s', color='orange')
     axs[0, 1].set_title('Radial Distortion $k_2$ vs Inverse Depth')
 
-    # Subplot 3: k3 vs depth
+    # k3 vs depth
     axs[1, 0].plot(depth, k3, marker='^', color='green')
     axs[1, 0].set_title('Radial Distortion $k_3$ vs Inverse Depth')
 
-    # Subplot 4: p1, p2 vs depth
+    # p1, p2 vs depth
     axs[1, 1].plot(depth, p1, marker='d', label='$p_1$')
     axs[1, 1].plot(depth, p2, marker='x', label='$p_2$')
     axs[1, 1].set_title('Tangential Distortion $p_1, p_2$ vs Inverse Depth')
@@ -142,7 +129,7 @@ def disp_focus_breathing():
         ax.grid(True)
 
     plt.tight_layout()
-    plt.show() # or plt.savefig('distortion.png')
+    plt.show()
 
 if __name__ == "__main__":
     # view focus breathing

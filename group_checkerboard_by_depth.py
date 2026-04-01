@@ -1,5 +1,4 @@
 from imgSet import checkerboard_img_sets
-from analysis import get_depths
 
 # tolerance for float comparision when grouping identical depth values
 DEPTH_ROUND_DECIMALS = 6
@@ -8,11 +7,9 @@ DEPTH_ROUND_DECIMALS = 6
 depth_groups = {}
 
 for set_key, img_set in checkerboard_img_sets.items():
-    fmin, fmax = get_depths(img_set)
-    assert len(fmin) == img_set.count and len(fmax) == img_set.count
-
     for idx in range(img_set.count):
-        depth = float((fmin[idx] + fmax[idx]) / 2.0)
+        fmin, fmax = img_set.get_focus_distance_range(idx)
+        depth = float((fmin + fmax) / 2.0)
         depth_key = round(depth, DEPTH_ROUND_DECIMALS)
         image_name = f"IMG_{img_set.start + idx:04d}.CR3"
         image_path = f"{img_set.folder}/{img_set.id}/{image_name}"

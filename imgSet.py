@@ -6,6 +6,7 @@ import numpy as np
 import numpy.linalg as la
 import json
 import os
+import matplotlib.pyplot as plt
 from depthGroup import depth_groups
 
 class imgSet:
@@ -68,11 +69,11 @@ class imgSet:
     
     def get_pose(self):
         """
-        Returns the pose for this image set
+        Returns the pose of the plane for this image set
         """
-        with open('pose_estimations.json', 'r') as f:
-            poses = json.load(f)
-        return poses[self.id]
+        with open(f"{self.folder}/{self.id}/pose.json", 'r') as f:
+            pose = json.load(f)
+        return pose
         
     def get_calib(self, idx):
         """
@@ -94,47 +95,10 @@ class imgSet:
         Returns a (count, height, width) matrix
         """
         return np.load(f"./stacks/{self.id}.npy")
-    
-    def calc_homography(self):
-        """
-        Returns the orientation of the imaged plane with respect to the camera as a 3x3 homography matrix
-        """
-        # locate aruco patches
-        
-        img = self.read_img(self.in_focus)
-        gt_img = self.read_gt()
-        
-        detector = ac.ArucoDetector(ac.getPredefinedDictionary(ac.DICT_5X5_50))
-        rects, ids, _ = detector.detectMarkers(img)
-        
-        # find homography between real image and calibration image
-        
-        with open(f"./calib_images/calib_{self.id}.json", 'r') as f:
-            gt_markers = json.load(f)
-        
-        dst_points = np.empty((4*len(gt_markers),2), dtype=rects[0].dtype)
-        src_points = np.empty((4*len(gt_markers),2), dtype=rects[0].dtype)
-        
-        i = 0
-        for marker in gt_markers:
-            origin = np.array(marker["origin"])
-            size = np.array(marker["size"])
-            src_points[i:i+4] = origin + np.array([[0,0], [size,0], [size,size], [0,size]])
-            dst_points[i:i+4] = rects[np.where(ids == marker["id"])[0][0]][0]
-            i += 4
-        
-        # debugging display
-        alpha = 0.5
-        H, _ = cv.findHomography(src_points, dst_points)
-        #warped = cv.warpPerspective(gt_img, H, (img.shape[1], img.shape[0]))
-        #warped_alpha = cv.warpPerspective(np.full((gt_img.shape[0], gt_img.shape[1]), alpha, dtype=np.float32), H, (img.shape[1], img.shape[0]))
-        #plt.imshow((warped*warped_alpha[:,:,None] + img*(1 - warped_alpha)[:,:,None])/255)
-        #plt.show()
-        
-        return H
 
+        
 bokeh_img_sets = {
-    "or1_ir0_ds20":imgSet("./bokeh_calib_photos", "or1_ir0_ds20", 996, 1018, 1035),
+    "or1_ir0_ds20": imgSet("./bokeh_calib_photos", "or1_ir0_ds20", 996, 1018, 1035),
     "or6_ir0_ds20": imgSet("./bokeh_calib_photos", "or6_ir0_ds20", 1036, 1058, 1074),
     "or6_ir3_ds20": imgSet("./bokeh_calib_photos", "or6_ir3_ds20", 1075, 1099, 1114),
     "or10_ir0_ds30": imgSet("./bokeh_calib_photos", "or10_ir0_ds30", 1115, 1137, 1154),
@@ -177,5 +141,3 @@ checkerboard_img_sets = {
     29:imgSet("./checkerboard_images", "29", 8854, 8873, 8893),
     30:imgSet("./checkerboard_images", "30", 8894, 8913, 8933),
 }
-
-#img_sets["or6_ir0_ds20"].calc_pose()

@@ -72,6 +72,12 @@ def gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radi
             calib_image[s[0]:e[0], s[1]:e[1]] = padded_marker[a[0]:b[0], a[1]:b[1]]
             markers.append({"id":int(marker_id), "origin":[int(marker_pos[1]), int(marker_pos[0])], "size":int(marker_outer_size)})
 
+    plt.imshow(calib_image)
+    for marker in markers:
+        origin = np.array(marker["origin"])
+        plt.plot(origin[0], origin[1], 'x')
+    plt.show()
+
     filename = f"calib_or{true_dot_outer_radius}_ir{true_dot_inner_radius}_ds{true_dot_spacing}"
     cv.imwrite(f"./calib_images/{filename}.png", calib_image)
     with open(f"./calib_images/{filename}.json", 'w') as f:

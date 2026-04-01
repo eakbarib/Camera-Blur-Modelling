@@ -8,16 +8,8 @@ Calibrating camera + lens depth of field blur using Mitsuba renderer for simulat
 
 - **`analysis.py`**: Contains functions for analyzing image sets and focus depths.
   - `disp_slices(slices)`: Displays slices of a 3D array using matplotlib with a slider.
-  - `focus_dist_curve(x, a, b, k)`: Mathematical model for focus distance curve.
-  - `get_depths(img_set)`: Extracts minimum and maximum focus distances from EXIF metadata for all images in a set.
-  - `get_depth(img_set, idx)`: Returns the average focus distance for a specific image index in the set.
   - `disp_focus_depth(img_set)`: Plots focus depth curves for an image set.
-
-- **`calculate_fov.py`**: Calculates field of view (FOV) from camera calibration data.
-  - `load_calibrations(depth_groups_dir)`: Loads calibration data (camera matrix and distortion coefficients) from depth folders.
-  - `interpolate_calibration(calibrations, target_depth)`: Interpolates calibration parameters for a specific depth.
-  - `calculate_fov(K, sensor_width_mm, sensor_height_mm)`: Computes horizontal and vertical FOV from camera matrix.
-  - `get_fov(target_depth_cm)`: Main function to get FOV at a target depth by loading and interpolating calibrations.
+  - `def disp_focus_breathing()`: Plots lens parameters vs focus distance.
 
 - **`calib_images.py`**: Generates calibration images with ArUco markers and dot patterns.
   - `gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radius, true_dot_spacing)`: Creates and saves calibration images with markers and dots for pose estimation.
@@ -26,16 +18,26 @@ Calibrating camera + lens depth of field blur using Mitsuba renderer for simulat
   - `calibrate_camera(images)`: Calibrates camera intrinsics using OpenCV's checkerboard detection.
   - Main script processes depth folders and saves calibration data to JSON files.
 
+- **`Camera.py`**: Defines a custom Mistuba sensor with differentible lens parameters
+
+- **`depthGroup.py`**: Defines the `depthGroup` class for handling checkerboard depth groups.
+  - `depthGroup.__init__(folder)`: Initializes a depth group from its folder
+  - `read_img(idx)`: Returns an image from the depth group
+  - Defines the `depth_groups` list.
+
 - **`group_checkerboard_by_depth.py`**: Groups checkerboard images by their focus depth.
   - Organizes images from `checkerboard_img_sets` into depth-based folders for calibration.
 
 - **`imgSet.py`**: Defines the `imgSet` class for handling image sets and related operations.
   - `imgSet.__init__(folder, set_id, start, in_focus, end)`: Initializes an image set with folder path and image range.
   - `imgSet.read_meta(idx)`: Reads EXIF metadata from a CR3 raw image file.
+  - `imgSet.get_focus_distance_range(idx)`: Returns the range of focus distances from the metadata.
   - `imgSet.read_img(idx)`: Reads and post-processes a CR3 raw image.
+  - `imgSet.get_gt_path()`: Returns the path to the calibration image used for this image set.
   - `imgSet.read_gt()`: Reads the corresponding calibration ground truth image.
+  - `imgSet.get_pose()`: Returns the pose of the plane for this image set.
+  - `imgSet.get_calib(idx)`: Returns the camera calibration for the depth of an image.
   - `imgSet.get_stack()`: Loads a pre-generated numpy array stack of grayscale images.
-  - `imgSet.calc_homography()`: Computes homography between real image and calibration image using ArUco markers.
   - Defines `bokeh_img_sets` and `checkerboard_img_sets` dictionaries with image set configurations.
 
 - **`mitsuba_simulation.py`**: Main script for rendering scenes using Mitsuba to simulate camera blur.
@@ -53,7 +55,9 @@ Calibrating camera + lens depth of field blur using Mitsuba renderer for simulat
 
 - **`requirements.txt`**: Lists Python dependencies (numpy, opencv, matplotlib, scipy, rawpy, exiv2, etc.).
 
-- **`setup.py`**: Generates focus stacks for image sets by converting CR3 images to grayscale numpy arrays.
+- **`setup.py`**: 
+  - Generates focus stacks for image sets by converting CR3 images to grayscale numpy arrays.
+  - Calculates poses for all image sets
 
 - **`pose_estimations.json`**: Output file containing estimated camera poses (transformation matrices) for each image set.
 

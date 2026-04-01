@@ -76,8 +76,8 @@ def main():
     # load parameters
     img_set = list(bokeh_img_sets.values())[0]
     
-    plane_pos = np.array(img_set.get_pose()['transformation_matrix'])
-    cam_pose = np.linalg.inv(plane_pos)
+    plane_pose = np.array(img_set.get_pose()['plane_pose'])
+    cam_pose = np.linalg.inv(plane_pose)
     # convert from opencv to mitsuba coords
     cam_pose = cam_pose @ np.diag([-1.0, -1.0, 1.0, 1.0])
     
