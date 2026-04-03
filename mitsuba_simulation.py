@@ -6,6 +6,9 @@ from imgSet import bokeh_img_sets
 import matplotlib.pyplot as plt
 import Camera
 
+# todo: fix scaling
+# try direct rendering mode
+
 def create_mitsuba_scene(cam_pose, calib_image_path, cam_mat, distortion, focus_distance, render_size):
     """Create Mitsuba scene dictionary"""
     
