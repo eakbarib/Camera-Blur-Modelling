@@ -17,10 +17,10 @@ class Camera(mi.Sensor):
         film_size = self.film().size()
         w, h = float(film_size.x), float(film_size.y)
         
-        self.fx = mi.Float(props.get('fx', 0.0)/w)
-        self.fy = mi.Float(props.get('fy', 0.0)/h)
-        self.cx = mi.Float(props.get('cx', 0.0)/w)
-        self.cy = mi.Float(props.get('cy', 0.0)/h)
+        self.fx = mi.Float(props.get('fx', 0.0))
+        self.fy = mi.Float(props.get('fy', 0.0))
+        self.cx = mi.Float(props.get('cx', 0.0))
+        self.cy = mi.Float(props.get('cy', 0.0))
         
         self.aperture_radius = mi.Float(props.get('aperture_radius', 0.0))
         self.focus_distance = mi.Float(props.get('focus_distance', 1.0))
