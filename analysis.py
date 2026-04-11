@@ -1,6 +1,9 @@
 from imgSet import bokeh_img_sets
 from depthGroup import depth_groups
 from scipy.ndimage import convolve
+import argparse
+import json
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Slider
@@ -131,35 +134,86 @@ def disp_focus_breathing():
     plt.tight_layout()
     plt.show()
 
+
+def load_optimized_focal_data(opt_dir="optimized_camera_matrix"):
+    records = []
+    if not os.path.isdir(opt_dir):
+        raise FileNotFoundError(f"Optimized camera matrix directory not found: {opt_dir}")
+
+    for filename in os.listdir(opt_dir):
+        if not filename.lower().endswith('.json'):
+            continue
+        path = os.path.join(opt_dir, filename)
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        depth = data.get('depth_m')
+        if depth is None:
+            continue
+
+        camera_matrix = np.array(data.get('camera_matrix', []), dtype=float)
+        gt_camera_matrix = np.array(data.get('gt_camera_matrix', []), dtype=float)
+        if camera_matrix.shape != (3, 3) or gt_camera_matrix.shape != (3, 3):
+            continue
+
+        records.append({
+            'depth': depth,
+            'fx': camera_matrix[0, 0],
+            'fy': camera_matrix[1, 1],
+            'gt_fx': gt_camera_matrix[0, 0],
+            'gt_fy': gt_camera_matrix[1, 1],
+        })
+
+    records.sort(key=lambda x: x['depth'])
+    return records
+
+
+def plot_focal_vs_depth(opt_dir='optimized_camera_matrix'):
+    records = load_optimized_focal_data(opt_dir)
+    if not records:
+        raise ValueError(f"No optimized camera matrix records found in {opt_dir}")
+
+    depths = [r['depth'] for r in records]
+    fx = [r['fx'] for r in records]
+    fy = [r['fy'] for r in records]
+    gt_fx = [r['gt_fx'] for r in records]
+    gt_fy = [r['gt_fy'] for r in records]
+
+    fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+    axs[0].plot(depths, fx, marker='o', label='camera_matrix $f_x$')
+    axs[0].plot(depths, gt_fx, marker='s', label='gt_camera_matrix $f_x$')
+    axs[0].set_title('Focal Length $f_x$ vs Depth')
+    axs[0].set_ylabel('Pixels')
+    axs[0].legend()
+    axs[0].grid(True)
+
+    axs[1].plot(depths, fy, marker='o', label='camera_matrix $f_y$')
+    axs[1].plot(depths, gt_fy, marker='s', label='gt_camera_matrix $f_y$')
+    axs[1].set_title('Focal Length $f_y$ vs Depth')
+    axs[1].set_xlabel('Depth (m)')
+    axs[1].set_ylabel('Pixels')
+    axs[1].legend()
+    axs[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
-    # view focus breathing
-    if True:
+    parser = argparse.ArgumentParser(description='Analysis helper for camera calibration and depth plots.')
+    parser.add_argument('--plot-focal-vs-depth', action='store_true', help='Plot fx and fy vs depth from optimized_camera_matrix JSON files.')
+    parser.add_argument('--optimized-camera-dir', default='optimized_camera_matrix', help='Directory containing optimized camera matrix JSON files.')
+    parser.add_argument('--focus-breathing', action='store_true', help='Show focus breathing plots.')
+    parser.add_argument('--no-default', action='store_true', help='Do not show default focus breathing plot when no other option is provided.')
+    args = parser.parse_args()
+
+    if args.plot_focal_vs_depth:
+        plot_focal_vs_depth(args.optimized_camera_dir)
+
+    if args.focus_breathing:
         disp_focus_breathing()
-    
-    # view focus derivative
-    if False:
-        sobel3d = [
-            [[ 1, 2, 1],
-            [ 2, 4, 2],
-            [ 1, 2, 1]],
-            [[ 0, 0, 0],
-            [ 0, 0, 0],
-            [ 0, 0, 0]],
-            [[-1,-2,-1],
-            [-2,-4,-2],
-            [-1,-2,-1]]
-        ]
-        
-        stack = bokeh_img_sets["or6_ir0_ds20"].get_stack()
-        derivative_focus = convolve(np.float32(stack), sobel3d, mode='constant', cval=0.0, axes=(0,1,2))
-        disp_slices(derivative_focus)
 
-    # view depth curves
-    if False:
-        disp_focus_depth(bokeh_img_sets["or6_ir0_ds20"])
-
-        for img_set in bokeh_img_sets.values():
-            fmin, fmax = get_depths(img_set)
-            plt.plot(fmin)
-            plt.show()
+    if not args.plot_focal_vs_depth and not args.focus_breathing and not args.no_default:
+        disp_focus_breathing()
 
