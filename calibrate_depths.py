@@ -11,7 +11,7 @@ SQUARE_SIZE = 1.0  # arbitrary units, since we care about relative intrinsics
 def calibrate_camera(image_paths):
     """
     Calibrate camera using checkerboard images.
-    Returns camera matrix, distortion coefficients, or None if failed.
+    Returns reprojection error, camera matrix, distortion coefficients, or None if failed.
     """
     objp = np.zeros((CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
     objp[:, :2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2) * SQUARE_SIZE
@@ -44,10 +44,10 @@ def calibrate_camera(image_paths):
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
     if ret:
-        return mtx, dist
+        return ret, mtx, dist
     else:
         print("Calibration failed")
-        return None, None
+        return None, None, None
 
 if __name__ == "__main__":
     depth_groups_dir = "depth_groups"
@@ -58,6 +58,9 @@ if __name__ == "__main__":
         print(f"Directory {depth_groups_dir} does not exist. Run group_checkerboard_by_depth.py first.")
         exit(1)
 
+    processed_count = 0
+    skipped_count = 0
+
     for depth_folder in sorted(os.listdir(depth_groups_dir)):
         depth_path = os.path.join(depth_groups_dir, depth_folder)
         if not os.path.isdir(depth_path) or not depth_folder.startswith("depth_"):
@@ -65,9 +68,11 @@ if __name__ == "__main__":
         
         json_path = os.path.join(depth_path, "calib.json")
         if skip_complete and os.path.exists(json_path):
+            skipped_count += 1
             continue
 
         print(f"Processing {depth_folder}...")
+        processed_count += 1
 
         # Load images
         image_paths = []
@@ -81,11 +86,12 @@ if __name__ == "__main__":
             continue
 
         # Calibrate
-        mtx, dist = calibrate_camera(image_paths)
+        ret, mtx, dist = calibrate_camera(image_paths)
 
-        if mtx is not None and dist is not None:
+        if ret is not None and mtx is not None and dist is not None:
             # Save to JSON
             calib_data = {
+                "reprojection_error": float(ret),
                 "camera_matrix": mtx.tolist(),
                 "distortion_coefficients": dist.tolist()
             }
@@ -97,4 +103,4 @@ if __name__ == "__main__":
                 json.dump({}, f, indent=4)
             print(f"Calibration failed for {depth_folder}")
 
-    print("Calibration complete.")
+    print(f"Calibration complete. Processed: {processed_count}, Skipped: {skipped_count}")

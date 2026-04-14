@@ -1,29 +1,39 @@
-import mitsuba as mi
-import drjit as dr
-import numpy as np
 import json
 import os
 import gc
 import cv2
+import drjit as dr
+import mitsuba as mi
 import matplotlib.pyplot as plt
+import numpy as np
 from imgSet import bokeh_img_sets
 
 mi.set_variant('cuda_ad_rgb')
 
+
 def get_crop_window_from_mask(mask_path, padding=50):
     mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    if mask is None: raise ValueError(f"Could not load mask at {mask_path}")
+    if mask is None:
+        raise ValueError(f"Could not load mask at {mask_path}")
+
     y_indices, x_indices = np.where(mask > 0)
-    if len(y_indices) == 0: raise ValueError("Mask is completely black!")
-    
+    if len(y_indices) == 0 or len(x_indices) == 0:
+        raise ValueError("Mask is completely black!")
+
     y_min, y_max = np.min(y_indices), np.max(y_indices)
     x_min, x_max = np.min(x_indices), np.max(x_indices)
+
     h, w = mask.shape
-    x_start, y_start = max(0, x_min - padding), max(0, y_min - padding)
-    x_end, y_end = min(w, x_max + padding), min(h, y_max + padding)
-    
-    return [int(x_start), int(y_start), int(x_end - x_start), int(y_end - y_start)], \
-           (int(y_start), int(y_end), int(x_start), int(x_end))
+    x_start = max(0, x_min - padding)
+    y_start = max(0, y_min - padding)
+    x_end = min(w, x_max + padding)
+    y_end = min(h, y_max + padding)
+
+    crop_width = x_end - x_start
+    crop_height = y_end - y_start
+    crop_window = [int(x_start), int(y_start), int(crop_width), int(crop_height)]
+    return crop_window, (int(y_start), int(y_end), int(x_start), int(x_end))
+
 
 def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, render_size, x_offset, y_offset, crop_w, crop_h):
     scene_dict = {
@@ -37,12 +47,19 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
             'fov_axis': 'x',
             'film': {
                 'type': 'hdrfilm',
-                'width': render_size[1], 'height': render_size[0],
-                'crop_offset_x': int(x_offset), 'crop_offset_y': int(y_offset),
-                'crop_width': int(crop_w), 'crop_height': int(crop_h),
-                'pixel_format': 'rgb', 'rfilter': {'type': 'gaussian'}
+                'width': render_size[1],
+                'height': render_size[0],
+                'crop_offset_x': int(x_offset),
+                'crop_offset_y': int(y_offset),
+                'crop_width': int(crop_w),
+                'crop_height': int(crop_h),
+                'pixel_format': 'rgb',
+                'rfilter': {'type': 'gaussian'}
             },
-            'sampler': {'type': 'independent', 'sample_count': 4}
+            'sampler': {
+                'type': 'independent',
+                'sample_count': 4
+            }
         },
         'calib_board': {
             'type': 'rectangle',
@@ -51,19 +68,30 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
                 'type': 'twosided',
                 'bsdf': {
                     'type': 'diffuse',
-                    'reflectance': {'type': 'bitmap', 'filename': calib_image_path, 'filter_type': 'bilinear'}
+                    'reflectance': {
+                        'type': 'bitmap',
+                        'filename': calib_image_path,
+                        'filter_type': 'bilinear'
+                    }
                 }
             }
         },
-        'light': {'type': 'constant', 'radiance': {'type': 'rgb', 'value': [1.0, 1.0, 1.0]}},
-        'integrator': {'type': 'path', 'max_depth': 2}
+        'light': {
+            'type': 'constant',
+            'radiance': {
+                'type': 'rgb',
+                'value': [1.0, 1.0, 1.0]
+            }
+        },
+        'integrator': {
+            'type': 'path',
+            'max_depth': 2
+        }
     }
     return scene_dict
 
-def main():
-    img_set = list(bokeh_img_sets.values())[0]
-    target_idx = img_set.in_focus + 10
 
+def optimize_single_target(img_set, target_idx, output_dir):
     # 1. Coordinate Setup
     plane_pose = np.array(img_set.get_pose()['plane_pose'])
     cam_pose = np.linalg.inv(plane_pose) @ np.diag([-1.0, -1.0, 1.0, 1.0])
@@ -76,8 +104,11 @@ def main():
     dist_coeffs = np.array(calib["distortion_coefficients"][0])
     photo = img_set.read_img(target_idx) / 255.0
 
-    calib = img_set.get_calib(target_idx)
-    gt_cam_mat = np.array(calib["camera_matrix"])
+    calib_gt = img_set.get_calib(target_idx)
+    if calib_gt is None:
+        print(f"No calibration found for target_idx {target_idx}; skipping output JSON")
+        return None
+    gt_cam_mat = np.array(calib_gt["camera_matrix"])
 
     # 3. Aligned Undistortion
     h, w = photo.shape[:2]
@@ -109,7 +140,7 @@ def main():
     
     base_board_transform = mi.Transform4f.scale([0.105, 0.1485, 1.0])
 
-    print(f"Starting FOV: {fov_x_deg:.4f}° | Optimizing...")
+    print(f"Optimizing target_idx {target_idx} | Starting FOV: {fov_x_deg:.4f}°")
 
     # 7. The Loop
     for i in range(25):
@@ -167,15 +198,29 @@ def main():
         
         "gt_camera_matrix": gt_cam_mat.tolist()
     }
-    
-    output_path = f"optimized_matrix_idx_{target_idx}.json"
-    with open(output_path, 'w') as f:
-        json.dump(result_data, f, indent=4)
-        
-    print(f"\nSaved physics-aligned matrix for target_idx {target_idx} to {output_path}")
-    # Final Render Overlay
-    # --- FINAL FULL-RES RENDER ---
-    print("\nOptimization complete")
+    return result_data
+
+def main():
+    img_set = list(bokeh_img_sets.values())[0]
+    start_idx = 27
+    end_idx = min(img_set.count - 1, img_set.in_focus + 14)
+
+    print(f"Running optimization for indices {start_idx} through {end_idx} (inclusive)")
+
+    output_dir = 'optimized_camera_matrix'
+    os.makedirs(output_dir, exist_ok=True)
+
+    for target_idx in range(start_idx, end_idx + 1):
+        print(f"\nProcessing target_idx {target_idx}")
+        result_data = optimize_single_target(img_set, target_idx, output_dir)
+        if result_data is None:
+            continue
+
+        output_path = os.path.join(output_dir, f'optimized_matrix_idx_{target_idx}.json')
+        with open(output_path, 'w') as f:
+            json.dump(result_data, f, indent=4)
+        print(f"Saved optimized matrix for target_idx {target_idx} to {output_path}")
+
 
 if __name__ == "__main__":
     main()
