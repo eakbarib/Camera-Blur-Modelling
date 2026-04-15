@@ -11,7 +11,7 @@ for set_key, img_set in checkerboard_img_sets.items():
         fmin, fmax = img_set.get_focus_distance_range(idx)
         depth = float((fmin + fmax) / 2.0)
         depth_key = round(depth, DEPTH_ROUND_DECIMALS)
-        image_name = f"IMG_{img_set.start + idx:04d}.CR3"
+        image_name = f"IMG_{img_set.start + idx:04d}.JPG"
         image_path = f"{img_set.folder}/{img_set.id}/{image_name}"
 
         depth_groups.setdefault(depth_key, []).append({
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         depth_dir = os.path.join(output_root, depth_name)
         os.makedirs(depth_dir, exist_ok=True)
 
-        # rename each image to simple numeric names (1.CR3, 2.CR3, ...)
+        # rename each image to simple numeric names (1.JPG, 2.JPG, ...)
         count = 0
         for img in group["images"]:
             src_path = os.path.normpath(img["image_path"])
@@ -67,7 +67,7 @@ if __name__ == "__main__":
                 continue
 
             count += 1
-            base_name = f"{count}.CR3"
+            base_name = f"{count}.JPG"
             dst_path = os.path.join(depth_dir, base_name)
 
             # ensure deterministic overwrite behavior: keep first if exists
@@ -77,15 +77,15 @@ if __name__ == "__main__":
 
             shutil.move(src_path, dst_path)
 
-        print(f"Saved {len([n for n in os.listdir(depth_dir) if n.endswith('.CR3')])} files to {depth_dir}")
+        print(f"Saved {len([n for n in os.listdir(depth_dir) if n.endswith('.JPG')])} files to {depth_dir}")
 
-    # delete any leftover duplicate-style names like 2_3.CR3, 2_4.CR3
+    # delete any leftover duplicate-style names like 2_3.JPG, 2_4.JPG
     for depth_name in os.listdir(output_root):
         depth_dir = os.path.join(output_root, depth_name)
         if not os.path.isdir(depth_dir):
             continue
         for filename in os.listdir(depth_dir):
-            if filename.endswith('.CR3') and '_' in filename:
+            if filename.endswith('.JPG') and '_' in filename:
                 os.remove(os.path.join(depth_dir, filename))
 
     print("\nReorganization complete.")

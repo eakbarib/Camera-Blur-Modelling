@@ -1,6 +1,5 @@
 import cv2 as cv
 import cv2.aruco as ac
-import rawpy
 import exiv2
 import numpy as np
 import numpy.linalg as la
@@ -10,12 +9,13 @@ import matplotlib.pyplot as plt
 from depthGroup import depth_groups
 
 class imgSet:
-    def __init__(self, folder, set_id, start, in_focus, end):
+    def __init__(self, folder, set_id, start, in_focus, end, extension='.JPG'):
         self.id = set_id
         self.start = start
         self.in_focus = in_focus - start
         self.count = end - start
         self.folder = folder
+        self.extension = extension
 
     def read_meta(self, idx):
         """
@@ -24,7 +24,8 @@ class imgSet:
         if (0 > idx or idx >= self.count):
             raise ValueError("Index out of range for image set")
         
-        path = f"{self.folder}/{self.id}/IMG_{self.start + idx:04d}.CR3"
+        filename = f"IMG_{self.start + idx:04d}{self.extension}"
+        path = os.path.join(self.folder, self.id, filename)
         
         meta_img = exiv2.ImageFactory.open(path)
         meta_img.readMetadata()
@@ -49,11 +50,14 @@ class imgSet:
         """
         if (0 > idx or idx >= self.count):
             raise ValueError("Index out of range for image set")
-        
-        path = f"{self.folder}/{self.id}/IMG_{self.start + idx:04d}.CR3"
-        
-        img = rawpy.imread(path)
-        return img.postprocess()
+
+        filename = f"IMG_{self.start + idx:04d}{self.extension}"
+        path = os.path.join(self.folder, self.id, filename)
+
+        img = cv.imread(path, cv.IMREAD_COLOR)
+        if img is None:
+            raise FileNotFoundError(f"Unable to load image: {path}")
+        return cv.cvtColor(img, cv.COLOR_BGR2RGB)
     
     def get_gt_path(self):
         """
@@ -98,76 +102,39 @@ class imgSet:
 
         
 bokeh_img_sets = {
-    "or1_ir0_ds20": imgSet("./bokeh_calib_photos", "or1_ir0_ds20", 996, 1018, 1035),
-    "or6_ir0_ds20": imgSet("./bokeh_calib_photos", "or6_ir0_ds20", 1036, 1058, 1074),
-    "or6_ir3_ds20": imgSet("./bokeh_calib_photos", "or6_ir3_ds20", 1075, 1099, 1114),
-    "or10_ir0_ds30": imgSet("./bokeh_calib_photos", "or10_ir0_ds30", 1115, 1137, 1154),
-    "or10_ir1_ds20": imgSet("./bokeh_calib_photos", "or10_ir1_ds20", 1155, 1177, 1194),
-    "or10_ir2_ds20": imgSet("./bokeh_calib_photos", "or10_ir2_ds20", 1195, 1217, 1234),
-    "or10_ir5_ds30": imgSet("./bokeh_calib_photos", "or10_ir5_ds30", 1235, 1257, 1274),
-    "or15_ir0_ds40": imgSet("./bokeh_calib_photos", "or15_ir0_ds40", 1275, 1297, 1314),
-    "or15_ir7_ds40": imgSet("./bokeh_calib_photos", "or15_ir7_ds40", 1315, 1337, 1354),
+    "or1_ir0_ds20": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or1_ir0_ds20", 9702, 9723, 9735),
+    "or6_ir0_ds20": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or6_ir0_ds20", 9736, 9757, 9769),
+    "or6_ir3_ds20": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or6_ir3_ds20", 9668, 9689, 9701),
+    "or10_ir0_ds30": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or10_ir0_ds30", 9906, 9927, 9939),
+    "or10_ir1_ds20": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or10_ir1_ds20", 9804, 9825, 9837),
+    "or10_ir2_ds20": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or10_ir2_ds20", 9838, 9859, 9871),
+    "or10_ir5_ds30": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or10_ir5_ds30", 9872, 9893, 9905),
+    "or15_ir0_ds40": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or15_ir0_ds40", 9770, 9791, 9803),
+    "or15_ir7_ds40": imgSet("./checkerboard & colmap/bokeh_calib_photos", "or15_ir7_ds40", 9940, 9961, 9973),
 }
 
+  # each set has 34 images, with the in-focus image at index 10 + first index, and the last image at index 33 + first index
+    # and we have 113 sets
+    # go into each directory in checkerboard & colmap/Focus Stack Calibration, and for each set, create an imgSet with the appropriate start, in_focus, and end indices
+    # the appropriate start index is the index of the first image in the set, which you read from the filename in the directory, for example for directory 1 it is "IMG_5816.JPG", for directory 2 it is "IMG_5850.JPG", and so on and there might be some missing images, so you should read the directory and find the first image and the last image, and use those indices to create the imgSet
+    # the in-focus image is always at index 10 + start index, and the last image is always at index 33 + start index, so you can use those indices to create the imgSet
+
 checkerboard_img_sets = {
-    1:imgSet("./checkerboard_images", "1", 1, 7, 19),
-    2:imgSet("./checkerboard_images", "2", 20, 47, 59),
-    3:imgSet("./checkerboard_images", "3", 60, 92, 100),
-    4:imgSet("./checkerboard_images", "4", 101, 131, 141),
-    5:imgSet("./checkerboard_images", "5", 142, 160, 182),
-    6:imgSet("./checkerboard_images", "6", 183, 207, 223),
-    7:imgSet("./checkerboard_images", "7", 306, 328, 346),
-    8:imgSet("./checkerboard_images", "8", 388, 410, 428),
-    9:imgSet("./checkerboard_images", "9", 429, 448, 469),
-    10:imgSet("./checkerboard_images", "10", 470, 496, 510),
-    11:imgSet("./checkerboard_images", "11", 511, 533, 551),
-    12:imgSet("./checkerboard_images", "12", 552, 576, 592),
-    13:imgSet("./checkerboard_images", "13", 593, 617, 633),
-    14:imgSet("./checkerboard_images", "14", 634, 653, 674),
-    15:imgSet("./checkerboard_images", "15", 675, 694, 715),
-    16:imgSet("./checkerboard_images", "16", 716, 740, 755),
-    17:imgSet("./checkerboard_images", "17", 756, 780, 795),
-    18:imgSet("./checkerboard_images", "18", 796, 819, 835),
-    19:imgSet("./checkerboard_images", "19", 836, 860, 875),
-    20:imgSet("./checkerboard_images", "20", 916, 937, 955),
-    21:imgSet("./checkerboard_images", "21", 956, 977, 995),
-    22:imgSet("./checkerboard_images", "22", 8533, 8554, 8572),
-    23:imgSet("./checkerboard_images", "23", 8586, 8594, 8613),
-    24:imgSet("./checkerboard_images", "24", 8654, 8670, 8693),
-    25:imgSet("./checkerboard_images", "25", 8694, 8713, 8733),
-    26:imgSet("./checkerboard_images", "26", 8734, 8753, 8773),
-    27:imgSet("./checkerboard_images", "27", 8774, 8793, 8813),
-    28:imgSet("./checkerboard_images", "28", 8814, 8835, 8853),
-    29:imgSet("./checkerboard_images", "29", 8854, 8873, 8893),
-    30:imgSet("./checkerboard_images", "30", 8894, 8913, 8933),
-    31:imgSet("./checkerboard_images", "31", 8992, 9013, 9033),
-    32:imgSet("./checkerboard_images", "32", 9034, 9053, 9074),
-    33:imgSet("./checkerboard_images", "33", 9075, 9094, 9115),
-    34:imgSet("./checkerboard_images", "34", 9116, 9135, 9156),
-    35:imgSet("./checkerboard_images", "35", 9157, 9176, 9197),
-    36:imgSet("./checkerboard_images", "36", 9198, 9217, 9238),
-    37:imgSet("./checkerboard_images", "37", 9239, 9258, 9279),
-    38:imgSet("./checkerboard_images", "38", 9280, 9299, 9320),
-    39:imgSet("./checkerboard_images", "39", 9321, 9340, 9361),
-    40:imgSet("./checkerboard_images", "40", 9362, 9381, 9402),
-    41:imgSet("./checkerboard_images", "41", 9403, 9422, 9443),
-    42:imgSet("./checkerboard_images", "42", 9444, 9463, 9484),
-    43:imgSet("./checkerboard_images", "43", 9526, 9544, 9566),
-    44:imgSet("./checkerboard_images", "44", 9567, 9586, 9607),
-    45:imgSet("./checkerboard_images", "45", 9608, 9627, 9648),
-    46:imgSet("./checkerboard_images", "46", 9690, 9668, 9730),
-    47:imgSet("./checkerboard_images", "47", 9731, 9750, 9771),
-    48:imgSet("./checkerboard_images", "48", 9772, 9791, 9812),
-    49:imgSet("./checkerboard_images", "49", 9813, 9832, 9853),
-    50:imgSet("./checkerboard_images", "50", 9895, 9914, 9935),
-    51:imgSet("./checkerboard_images", "51", 9936, 9955, 9999),
-    52:imgSet("./checkerboard_images", "52", 224, 244, 264),
-    53:imgSet("./checkerboard_images", "53", 265, 285, 305),
-    54:imgSet("./checkerboard_images", "54", 347, 367, 387),
-    55:imgSet("./checkerboard_images", "55", 876, 895, 915),
-    56:imgSet("./checkerboard_images", "56", 8614, 8634, 8653),
-    57:imgSet("./checkerboard_images", "57", 8946, 8965, 8991),
-    58:imgSet("./checkerboard_images", "58", 9485, 9504, 9525),
-    59:imgSet("./checkerboard_images", "59", 9649, 9668, 9689),
-    60:imgSet("./checkerboard_images", "60", 9854, 9874, 9894),
 }
+
+for dir_name in os.listdir("./checkerboard & colmap/Focus Stack Calibration"):
+    dir_path = os.path.join("./checkerboard & colmap/Focus Stack Calibration", dir_name)
+    if not os.path.isdir(dir_path):
+        continue
+    
+    img_files = [f for f in os.listdir(dir_path) if f.lower().endswith('.jpg')]
+    if not img_files:
+        continue
+    
+    img_files.sort()
+    start_idx = int(img_files[0][4:8])  # Extract the number from "IMG_####.JPG"
+    end_idx = int(img_files[-1][4:8])  # Extract the number from the last image file
+    in_focus_idx = start_idx + 10  # In-focus image is always at index 10 + start index
+    
+    set_id = dir_name
+    checkerboard_img_sets[set_id] = imgSet("./checkerboard & colmap/Focus Stack Calibration", set_id, start_idx, in_focus_idx, end_idx, '.JPG')

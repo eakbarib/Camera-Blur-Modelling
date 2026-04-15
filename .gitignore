@@ -1,5 +1,6 @@
 .venv/*
 .venv/
+*.JPG
 *.CR3
 stacks/*
 __pycache__/*
