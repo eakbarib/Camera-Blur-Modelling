@@ -1,6 +1,6 @@
 import os
 import json
-import rawpy
+import cv2 as cv
 
 class depthGroup:
     def __init__(self, folder):
@@ -17,7 +17,7 @@ class depthGroup:
             with open(calib_path, 'r') as f:
                 self.calibration = json.load(f)
              
-        self.count = sum(1 for filename in os.listdir(folder) if filename.endswith(".CR3"))
+        self.count = sum(1 for filename in os.listdir(folder) if filename.endswith(".JPG"))
         
     def read_img(self, idx):
         """_summary_
@@ -26,9 +26,11 @@ class depthGroup:
         if (0 > idx or idx >= self.count):
             raise ValueError("Index out of range for depth group")
         
-        path = os.path.join(self.folder, f"{idx + 1}.CR3")
-        img = rawpy.imread(path)
-        return img.postprocess()
+        path = os.path.join(self.folder, f"{idx + 1}.JPG")
+        img = cv.imread(path, cv.IMREAD_COLOR)
+        if img is None:
+            raise FileNotFoundError(f"Unable to load image: {path}")
+        return cv.cvtColor(img, cv.COLOR_BGR2RGB)
         
 
 depth_groups = []
