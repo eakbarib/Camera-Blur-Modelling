@@ -50,7 +50,7 @@ def reconstruct_3d(database_name, output_dir, image_dir, image_paths, intrinsics
         db.commit()
     
     # match images (maybe this can be done before setting cams, but I'm not sure)
-    #pycolmap.match_exhaustive(database_path)
+    pycolmap.match_exhaustive(database_path)
     
     # why do we have to specify image_dir again, all the paths are already in the db
     maps = pycolmap.incremental_mapping(database_path, image_dir, output_dir)
