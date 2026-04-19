@@ -14,6 +14,8 @@ bokeh_calib_photos/*/*.JPG
 checkerboard_images/*/*.JPG
 depth_groups/*/*.JPG
 colmap/*
+colmap-bin/*
+checkerboard & colmap/*
 *.db
 *.pyc
 *.xmp
