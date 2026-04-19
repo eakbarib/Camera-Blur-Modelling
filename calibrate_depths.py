@@ -206,7 +206,7 @@ def compute_mean_reprojection_error(objpoints, imgpoints, mtx, dist, rvecs, tvec
 
 if __name__ == "__main__":
     depth_groups_dir = "depth_groups"
-    single_focus_dir = os.path.join("checkerboard & colmap", "Single Focus Calibration")
+    single_focus_dir = "single_focus_checkerboard"
     
     skip_complete = True # skips folders with an existing calibration
 
