@@ -7,16 +7,44 @@ import mitsuba as mi
 import numpy as np
 from imgSet import dot_stack_sets
 from common import *
+import matplotlib.pyplot as plt
 
 mi.set_variant('cuda_ad_rgb')
 
+def gen_mask(plane_pose, cam_mat, shape):
+    """
+    plane_pose: 4x4 matrix (Extrinsics)
+    cam_mat: 3x3 matrix (Intrinsics)
+    shape: (height, width) of the target output image
+    paper_size_m: (width, height) of the physical paper in meters
+    paper_size_px: (width, height) of the mask you are warping
+    """
+    
+    S = np.array([
+        [m_per_px, 0, -0.5*paper_size_m[0]],
+        [0, m_per_px, -0.5*paper_size_m[1]],
+        [0, 0, 1]
+    ])
 
-def get_crop_window_from_mask(mask_path, padding=50):
-    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    if mask is None:
-        raise ValueError(f"Could not load mask at {mask_path}")
+    H_pose = cam_mat @ plane_pose[:3, [0, 1, 3]]
+    
+    H = H_pose @ S
 
-    y_indices, x_indices = np.where(mask > 0)
+    base_mask = np.ones((int(paper_size_px[1]), int(paper_size_px[0])), dtype=np.uint8)
+
+    mask_warped = cv2.warpPerspective(
+        base_mask, 
+        H, 
+        (shape[1], shape[0]), 
+        flags=cv2.INTER_NEAREST,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0
+    )
+    
+    return mask_warped > 0
+
+def get_crop_window_from_mask(mask, padding=50):
+    y_indices, x_indices = np.where(mask)
     if len(y_indices) == 0 or len(x_indices) == 0:
         raise ValueError("Mask is completely black!")
 
@@ -29,10 +57,7 @@ def get_crop_window_from_mask(mask_path, padding=50):
     x_end = min(w, x_max + padding)
     y_end = min(h, y_max + padding)
 
-    crop_width = x_end - x_start
-    crop_height = y_end - y_start
-    crop_window = [int(x_start), int(y_start), int(crop_width), int(crop_height)]
-    return crop_window, (int(y_start), int(y_end), int(x_start), int(x_end))
+    return (int(x_start), int(y_start), int(x_end - x_start), int(y_end - y_start))
 
 
 def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, render_size, x_offset, y_offset, crop_w, crop_h):
@@ -53,7 +78,7 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
                 'crop_offset_y': int(y_offset),
                 'crop_width': int(crop_w),
                 'crop_height': int(crop_h),
-                'pixel_format': 'rgb',
+                'pixel_format': 'luminance',
                 'rfilter': {'type': 'gaussian'}
             },
             'sampler': {
@@ -91,43 +116,52 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
     return scene_dict
 
 
-def optimize_single_target(img_set, target_idx, output_dir):
+def optimize_single_target(img_set, target_idx):
     # 1. Coordinate Setup
     plane_pose = np.array(img_set.get_pose()['plane_pose'])
     cam_pose = np.linalg.inv(plane_pose) @ np.diag([-1.0, -1.0, 1.0, 1.0])
     
     # 2. Extract Depth and FOV baseline
-    depth_min, depth_max = img_set.get_focus_distance_range(target_idx)
-    depth = (depth_min + depth_max) * 0.5
+    depth = img_set.get_focus_distance_range(target_idx)[2]
     cam_mat, dist_coeffs = load_calibration(checkerboard_single_path / "calib.json")
-    photo = img_set.read_img(target_idx) / 255.0
+    
+    # 3. Load ground truth image
+    photo = img_set.read_img(target_idx).astype(np.float32)/255.0
+    photo_grey = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
+    photo_lin = np.power(photo_grey, 2.2)
 
-    # 3. Aligned Undistortion
+    # 3.1 undistortion
     h, w = photo.shape[:2]
     perfect_cam_mat = cam_mat.copy()
-    perfect_cam_mat[0, 2], perfect_cam_mat[1, 2] = w / 2.0, h / 2.0
-    photo_aligned = cv2.undistort(photo, cam_mat, dist_coeffs, None, perfect_cam_mat)
+    perfect_cam_mat[:2, 2] = (w/2, h/2)
+    photo_aligned = cv2.undistort(photo_lin, cam_mat, dist_coeffs, None, perfect_cam_mat)
     
     fx_orig = float(cam_mat[0, 0])
     fov_x_deg = np.degrees(2.0 * np.arctan(w / (2.0 * fx_orig)))
 
-    # 4. Prepare Cropped Ground Truth (NumPy-side for VRAM safety)
-    crop_list, (y1, y2, x1, x2) = get_crop_window_from_mask("./boardmask.png", padding=50)
-    photo_crop = photo_aligned[y1:y2, x1:x2]
-    photo_crop_linear = np.power(photo_crop, 2.2).astype(np.float32)
-    gt_crop = mi.TensorXf(np.ascontiguousarray(photo_crop_linear))
+    # 3.2 cropping
+    mask = gen_mask(plane_pose, perfect_cam_mat, photo.shape)
+    cx, cy, cw, ch = get_crop_window_from_mask(mask, padding=50)
+    photo_crop = photo_aligned[cy:cy+ch, cx:cx+cw]
+    
+    # 3.3 normalization (put masked region in 0-1 range)
+    low = np.min(photo_lin, initial=0, where=mask)
+    high = np.max(photo_lin, initial=1, where=mask)
+    photo_normalized = (photo_crop - low)/(high - low)
+    
+    ground = mi.TensorXf(np.ascontiguousarray(photo_normalized[:,:,None]))
 
     # 5. Scene Loading
-    scene_dict = create_mitsuba_scene(cam_pose, img_set.get_gt_path(), fov_x_deg, depth, 
-                                     photo_aligned.shape[:2], x1, y1, crop_list[2], crop_list[3])
+    scene_dict = create_mitsuba_scene(cam_pose, img_set.get_pattern_path(), fov_x_deg, depth, 
+                                     photo_aligned.shape[:2], cx, cy, cw, ch)
     scene = mi.load_dict(scene_dict)
     params = mi.traverse(scene)
 
     # 6. Optimized Parameters Setup
-    opt_fov = dr.opt.Adam(lr=0.1)
+    opt_fov = dr.opt.Adam(lr=1e0)
     opt_fov['x_fov'] = params['sensor.x_fov']
     
-    opt_trans = dr.opt.Adam(lr=0.001)
+    opt_trans = dr.opt.Adam(lr=1e-2)
     opt_trans['tx'], opt_trans['ty'] = mi.Float(0.0), mi.Float(0.0)
     
     base_board_transform = mi.Transform4f.scale([0.105, 0.1485, 1.0])
@@ -141,21 +175,18 @@ def optimize_single_target(img_set, target_idx, output_dir):
         params['calib_board.to_world'] = mi.Transform4f.translate(offset) @ base_board_transform
         params['sensor.x_fov'] = opt_fov['x_fov']
         params.update()
+        
+        # Render and take Loss
+        render = mi.render(scene, params, seed=i, spp=4)
+        loss = dr.mean(dr.square(render - ground))
 
-        # Render and Loss
-        image_crop = mi.render(scene, params, seed=i, spp=4)
-        loss = dr.mean(dr.square(image_crop - gt_crop))
-
+        # Step
         dr.backward(loss)
         opt_fov.step()
         opt_trans.step()
         dr.eval(opt_fov['x_fov'], opt_trans['tx'], opt_trans['ty'])
 
         print(f"Epoch {i:02d} | Loss: {loss.array[0]:.5f} | FOV: {opt_fov['x_fov'][0]:.4f}° | dx: {opt_trans['tx'][0]:.5f}")
-
-        # The Nuclear Memory Reset
-        del image_crop, loss
-        gc.collect()
 
     # 8. Post-Optimization Physics Math
     fov_opt = float(opt_fov['x_fov'][0])
@@ -169,10 +200,10 @@ def optimize_single_target(img_set, target_idx, output_dir):
     pixel_shift_y = fy_new * (ty_val / depth)
     
     # Build Corrected Matrix
-    new_cam_mat = cam_mat.copy()
-    new_cam_mat[0, 0], new_cam_mat[1, 1] = fx_new, fy_new
-    new_cam_mat[0, 2] = cam_mat[0, 2] - pixel_shift_x
-    new_cam_mat[1, 2] = cam_mat[1, 2] + pixel_shift_y
+    new_cam_mat = np.array([
+        [fx_new, 0, cam_mat[0, 2] - pixel_shift_x],
+        [0, fy_new, cam_mat[1, 2] + pixel_shift_y]
+    ])
 
     # 9. JSON Output
     result_data = {
@@ -184,32 +215,36 @@ def optimize_single_target(img_set, target_idx, output_dir):
         
         # Original matrix for comparison
         "original_camera_matrix": cam_mat.tolist(),
+        "original_distortion": dist_coeffs.tolist(),
         
-        # The specific corrected matrix for this target_idx
-        "camera_matrix": new_cam_mat.tolist()
+        # The corrected calibration for this target_idx
+        "camera_matrix": new_cam_mat.tolist(),
+        "distortion_coefficients": dist_coeffs.tolist()
     }
     return result_data
 
 def main():
-    img_set = dot_stack_sets["or10_ir1_ds20"]
-    start_idx = 27
-    end_idx = min(img_set.count - 1, img_set.in_focus + 14)
+    for set_id in dot_stack_sets.keys():
+        img_set = dot_stack_sets[set_id]
 
-    print(f"Running optimization for indices {start_idx} through {end_idx} (inclusive)")
+        print(f"Running optimization for {set_id}")
 
-    output_dir = 'optimized_camera_matrix'
-    os.makedirs(output_dir, exist_ok=True)
+        output_dir = optimized_calibration_path
+        output_dir.mkdir(exist_ok=True)
 
-    for target_idx in range(start_idx, end_idx + 1):
-        print(f"\nProcessing target_idx {target_idx}")
-        result_data = optimize_single_target(img_set, target_idx, output_dir)
-        if result_data is None:
-            continue
+        for target_idx in range(0, img_set.count):
+            depth = img_set.get_focus_distance_range(target_idx)[2]
+            print(f"\nProcessing index {target_idx} of {img_set.count}, depth: {depth}")
+            
+            result_data = optimize_single_target(img_set, target_idx)
+            if result_data is None:
+                print("Optimization failed, skipping")
+                continue
 
-        output_path = os.path.join(output_dir, f'optimized_matrix_idx_{target_idx}.json')
-        with open(output_path, 'w') as f:
-            json.dump(result_data, f, indent=4)
-        print(f"Saved optimized matrix for target_idx {target_idx} to {output_path}")
+            output_path = output_dir / f'calib_{set_id}_{depth}.json'
+            with open(output_path, 'w') as f:
+                json.dump(result_data, f, indent=4)
+            print(f"Saved optimized matrix for depth {depth} to {output_path}")
 
 
 if __name__ == "__main__":

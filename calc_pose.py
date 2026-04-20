@@ -69,5 +69,5 @@ def calc_pose(img_set):
     result = {
         "plane_pose": T.tolist()
     }
-    with open(f"{img_set.folder}/{img_set.id}/pose.json", 'w') as f:
+    with open(img_set.folder / "pose.json", 'w') as f:
         json.dump(result, f, indent=4)

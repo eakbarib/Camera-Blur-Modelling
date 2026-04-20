@@ -19,7 +19,7 @@ class imgSet:
         """
         Returns the path to the calibration image used for this image set
         """
-        return f"./calib_images/calib_{self.id}.png"
+        return f"./dot_patterns/calib_{self.id}.png"
     
     def get_focus_distance_range(self, idx):
         """Returns the min, max, and avg focus distance from image metadata"""
@@ -43,15 +43,24 @@ class imgSet:
         """
         Returns the dot pattern used for this image set
         """
-        return cv.imread(self.get_gt_path())
+        return cv.imread(self.get_pattern_path(), cv.IMREAD_GRAYSCALE)
     
     def get_pose(self):
         """
         Returns the pose of the plane for this image set
         """
-        with open(self.folder / f"{self.id}/pose.json", 'r') as f:
+        with open(self.folder / "pose.json", 'r') as f:
             pose = json.load(f)
         return pose
+    
+    def get_optim_calib(self, idx):
+        """
+        Returns the optimized calibration for this image
+        """
+        depth = self.get_focus_distance_range(idx)[2]
+        optim_path = optimized_calibration_path / f"calib_{self.id}_{depth}.json"
+        
+        return load_calibration(optim_path)
         
     def get_calib(self, idx):
         """
@@ -73,15 +82,15 @@ class imgSet:
         return closest_depth.calibration
         
 dot_stack_sets = {
-    "or1_ir0_ds20": imgSet(dot_stack_path, "or1_ir0_ds20", 9702, 9723, 9735),
-    "or6_ir0_ds20": imgSet(dot_stack_path, "or6_ir0_ds20", 9736, 9757, 9769),
-    "or6_ir3_ds20": imgSet(dot_stack_path, "or6_ir3_ds20", 9668, 9689, 9701),
-    "or10_ir0_ds30": imgSet(dot_stack_path, "or10_ir0_ds30", 9906, 9927, 9939),
-    "or10_ir1_ds20": imgSet(dot_stack_path, "or10_ir1_ds20", 9804, 9825, 9837),
-    "or10_ir2_ds20": imgSet(dot_stack_path, "or10_ir2_ds20", 9838, 9859, 9871),
-    "or10_ir5_ds30": imgSet(dot_stack_path, "or10_ir5_ds30", 9872, 9893, 9905),
-    "or15_ir0_ds40": imgSet(dot_stack_path, "or15_ir0_ds40", 9770, 9791, 9803),
-    "or15_ir7_ds40": imgSet(dot_stack_path, "or15_ir7_ds40", 9940, 9961, 9973),
+    "or1_ir0_ds20": imgSet(dot_stack_path / "or1_ir0_ds20", "or1_ir0_ds20", 9702, 9723, 9735),
+    "or6_ir0_ds20": imgSet(dot_stack_path / "or6_ir0_ds20", "or6_ir0_ds20", 9736, 9757, 9769),
+    "or6_ir3_ds20": imgSet(dot_stack_path / "or6_ir3_ds20", "or6_ir3_ds20", 9668, 9689, 9701),
+    "or10_ir0_ds30": imgSet(dot_stack_path / "or10_ir0_ds30", "or10_ir0_ds30", 9906, 9927, 9939),
+    "or10_ir1_ds20": imgSet(dot_stack_path / "or10_ir1_ds20", "or10_ir1_ds20", 9804, 9825, 9837),
+    "or10_ir2_ds20": imgSet(dot_stack_path / "or10_ir2_ds20", "or10_ir2_ds20", 9838, 9859, 9871),
+    "or10_ir5_ds30": imgSet(dot_stack_path / "or10_ir5_ds30", "or10_ir5_ds30", 9872, 9893, 9905),
+    "or15_ir0_ds40": imgSet(dot_stack_path / "or15_ir0_ds40", "or15_ir0_ds40", 9770, 9791, 9803),
+    "or15_ir7_ds40": imgSet(dot_stack_path / "or15_ir7_ds40", "or15_ir7_ds40", 9940, 9961, 9973),
 }
 
   # each set has 34 images, with the in-focus image at index 10 + first index, and the last image at index 33 + first index

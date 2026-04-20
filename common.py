@@ -3,8 +3,8 @@ import exiv2
 import numpy as np
 import json
 
-paper_size_m = (0.210, 0.297)
-paper_size_px = (2048, int(np.sqrt(2)*2048))
+paper_size_m = np.array((0.210, 0.297))
+paper_size_px = np.array((2048, int(np.sqrt(2)*2048)))
 m_per_px = paper_size_m[0]/paper_size_px[0]
 
 dot_patterns_path = Path("dot_patterns")
@@ -13,6 +13,7 @@ checkerboard_stack_path = Path("checkerboard_stacks")
 checkerboard_single_path = Path("checkerboard_singles")
 colmap_room_path = Path("colmap/room")
 colmap_tabletop_path = Path("colmap/tabletop")
+optimized_calibration_path = Path("optimized_calibrations")
 
 # todo: 
 # replace copying into depth groups with creating a registry in depthGroup.py
@@ -32,6 +33,8 @@ def read_image_depth_range(image_path):
         return None
     
 def load_calibration(calib_path):
+    if not calib_path.exists():
+        return None
     with calib_path.open(mode='r') as f:
         calib = json.load(f)
     K = np.array(calib["camera_matrix"])
