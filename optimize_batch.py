@@ -131,18 +131,12 @@ def optimize_single_target(img_set, target_idx, downscale=2):
     photo_grey = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
     photo_small = cv2.resize(photo_grey, None, fx=1/downscale, fy=1/downscale, interpolation=cv2.INTER_AREA)
     photo_lin = np.power(photo_small, 2.2)
-    
-    #plt.imshow(photo_grey)
-    #plt.show()
 
     # 3.1 undistortion
     h, w = photo_small.shape[:2]
     perfect_cam_mat = cam_mat.copy()
     perfect_cam_mat[:2, 2] = (w/2, h/2)
     photo_aligned = cv2.undistort(photo_lin, cam_mat, dist_coeffs, None, perfect_cam_mat)
-    
-    #plt.imshow(photo_aligned)
-    #plt.show()
     
     fx_orig = float(cam_mat[0, 0])
     fov_x_deg = np.degrees(2.0 * np.arctan(w / (2.0 * fx_orig)))
@@ -152,16 +146,10 @@ def optimize_single_target(img_set, target_idx, downscale=2):
     cx, cy, cw, ch = get_crop_window_from_mask(mask, padding=50)
     photo_crop = photo_aligned[cy:cy+ch, cx:cx+cw]
     
-    #plt.imshow(mask)
-    #plt.show()
-    
     # 3.3 normalization (put masked region in 0-1 range)
     low = np.min(photo_lin, initial=0, where=mask)
     high = np.max(photo_lin, initial=1, where=mask)
     photo_normalized = (photo_crop - low)/(high - low)
-    
-    #plt.imshow(photo_normalized)
-    #plt.show()
     
     ground = mi.TensorXf(np.ascontiguousarray(photo_normalized[:,:,None]))
 
@@ -173,8 +161,8 @@ def optimize_single_target(img_set, target_idx, downscale=2):
 
     # 6. Optimized Parameters Setup
     epochs = 25
-    lr_fov_min, lr_fov_max = 1e-2, 5e-1
-    lr_trans_min, lr_trans_max = 1e-5, 1e-2
+    lr_fov_min, lr_fov_max = 1e-2, 1e0
+    lr_trans_min, lr_trans_max = 1e-8, 1e-5
     
     opt_fov = dr.opt.Adam(lr=lr_fov_max)
     opt_fov['x_fov'] = params['sensor.x_fov']
@@ -204,6 +192,8 @@ def optimize_single_target(img_set, target_idx, downscale=2):
         # Render and take Loss
         render = mi.render(scene, params, seed=i, spp=4)
         loss = dr.mean(dr.square(render - ground))
+        #plt.imshow(np.array(mi.Bitmap(dr.square(render - ground))))
+        #plt.show()
 
         # Step
         dr.backward(loss)
@@ -227,8 +217,10 @@ def optimize_single_target(img_set, target_idx, downscale=2):
     # Build Corrected Matrix
     new_cam_mat = np.array([
         [fx_new, 0, cam_mat[0, 2] - pixel_shift_x],
-        [0, fy_new, cam_mat[1, 2] + pixel_shift_y]
+        [0, fy_new, cam_mat[1, 2] + pixel_shift_y],
+        [0, 0, 1]
     ])
+    new_cam_mat[:2] *= downscale
 
     # 9. JSON Output
     result_data = {
