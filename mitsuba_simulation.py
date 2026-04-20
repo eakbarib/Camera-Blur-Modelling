@@ -2,11 +2,11 @@ import mitsuba as mi
 import drjit as dr
 import numpy as np
 import json
-import os
 import gc
 import cv2
-import matplotlib.pyplot as plt
 from imgSet import bokeh_img_sets
+
+# Mitsuba Scene for Debugging / Analysis (not used in pipeline)
 
 mi.set_variant('cuda_ad_rgb')
 

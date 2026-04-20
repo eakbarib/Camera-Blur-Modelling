@@ -4,9 +4,9 @@ import gc
 import cv2
 import drjit as dr
 import mitsuba as mi
-import matplotlib.pyplot as plt
 import numpy as np
-from imgSet import bokeh_img_sets
+from imgSet import dot_stack_sets
+from common import *
 
 mi.set_variant('cuda_ad_rgb')
 
@@ -99,16 +99,8 @@ def optimize_single_target(img_set, target_idx, output_dir):
     # 2. Extract Depth and FOV baseline
     depth_min, depth_max = img_set.get_focus_distance_range(target_idx)
     depth = (depth_min + depth_max) * 0.5
-    calib = img_set.get_calib(img_set.in_focus)
-    cam_mat = np.array(calib["camera_matrix"])
-    dist_coeffs = np.array(calib["distortion_coefficients"][0])
+    cam_mat, dist_coeffs = load_calibration(checkerboard_single_path / "calib.json")
     photo = img_set.read_img(target_idx) / 255.0
-
-    calib_gt = img_set.get_calib(target_idx)
-    if calib_gt is None:
-        print(f"No calibration found for target_idx {target_idx}; skipping output JSON")
-        return None
-    gt_cam_mat = np.array(calib_gt["camera_matrix"])
 
     # 3. Aligned Undistortion
     h, w = photo.shape[:2]
@@ -142,7 +134,7 @@ def optimize_single_target(img_set, target_idx, output_dir):
 
     print(f"Optimizing target_idx {target_idx} | Starting FOV: {fov_x_deg:.4f}°")
 
-    # 7. The Loop
+    # 7. Optimization Loop
     for i in range(25):
         # Apply transforms
         offset = mi.Vector3f(opt_trans['tx'], opt_trans['ty'], mi.Float(0.0))
@@ -194,14 +186,12 @@ def optimize_single_target(img_set, target_idx, output_dir):
         "original_camera_matrix": cam_mat.tolist(),
         
         # The specific corrected matrix for this target_idx
-        "camera_matrix": new_cam_mat.tolist(),
-        
-        "gt_camera_matrix": gt_cam_mat.tolist()
+        "camera_matrix": new_cam_mat.tolist()
     }
     return result_data
 
 def main():
-    img_set = list(bokeh_img_sets.values())[0]
+    img_set = dot_stack_sets["or10_ir1_ds20"]
     start_idx = 27
     end_idx = min(img_set.count - 1, img_set.in_focus + 14)
 

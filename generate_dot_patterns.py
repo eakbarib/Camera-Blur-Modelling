@@ -3,19 +3,20 @@ import cv2.aruco as ac
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+from common import *
 
 def gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radius, true_dot_spacing):
     """
-    Generates a calibration image and saves it to `calib_images/`
+    Generates a calibration image and saves it to `dot_patterns/`
     """
-    true_width = 210
+    width_mm = paper_size_m[0]*1000
     
     marker_dict = ac.getPredefinedDictionary(ac.DICT_5X5_50)
 
-    dest_width = 2048
-    dest_height = int(np.sqrt(2)*dest_width)
+    dest_width = paper_size_px[0]
+    dest_height = paper_size_px[1]
 
-    conversion_factor = dest_width/true_width
+    conversion_factor = dest_width/width_mm
 
     calib_image = np.full((dest_height, dest_width), 255, dtype=np.uint8)
 
@@ -72,15 +73,18 @@ def gen_calib_image(true_marker_size, true_dot_outer_radius, true_dot_inner_radi
             calib_image[s[0]:e[0], s[1]:e[1]] = padded_marker[a[0]:b[0], a[1]:b[1]]
             markers.append({"id":int(marker_id), "origin":[int(marker_pos[1]), int(marker_pos[0])], "size":int(marker_outer_size)})
 
-    plt.imshow(calib_image)
-    for marker in markers:
-        origin = np.array(marker["origin"])
-        plt.plot(origin[0], origin[1], 'x')
-    plt.show()
+    # debug display
+    #plt.imshow(calib_image)
+    #for marker in markers:
+    #    origin = np.array(marker["origin"])
+    #    plt.plot(origin[0], origin[1], 'x')
+    #plt.show()
 
     filename = f"calib_or{true_dot_outer_radius}_ir{true_dot_inner_radius}_ds{true_dot_spacing}"
-    cv.imwrite(f"./calib_images/{filename}.png", calib_image)
-    with open(f"./calib_images/{filename}.json", 'w') as f:
+    # write image
+    cv.imwrite(dot_patterns_path / f"{filename}.png", calib_image)
+    # write marker positions
+    with open(dot_patterns_path / f"{filename}.json", 'w') as f:
         json.dump(markers, f, indent=4)
 
 gen_calib_image(15, 15, 7, 40)
