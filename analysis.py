@@ -95,6 +95,38 @@ def disp_focus_breathing():
 
     plt.tight_layout()
     plt.show()
+    
+"""
+pattern results:
+dots performed significantly better than hoops
+tightly packed objects performed poorly
+
+todo: run colmap for good patterns to decide which is the best overall
+
+good:
+or15_ir0_ds40
+ - large dots
+or10_ir0_ds30
+ - med dots
+or1_ir0_ds20
+ - very small dots
+
+mid:
+or10_ir5_ds30
+ - med hoops
+or6_ir0_ds20
+ - small dots
+or15_ir7_ds40
+ - large hoops
+
+bad:
+or10_ir1_ds20
+ - tightly packed hoops
+or10_ir2_ds20
+ - tightly packed hoops
+or6_ir3_ds20
+ - small hoops
+"""
 
 def plot_focal_vs_depth(show_baseline, show_interpolated):
     
