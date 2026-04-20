@@ -1,11 +1,11 @@
 import json
-import os
-import gc
+import argparse
 import cv2
 import drjit as dr
 import mitsuba as mi
 import numpy as np
 from imgSet import dot_stack_sets
+import math
 from common import *
 import matplotlib.pyplot as plt
 
@@ -88,7 +88,7 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
         },
         'calib_board': {
             'type': 'rectangle',
-            'to_world': mi.ScalarTransform4f().scale([0.105, 0.1485, 1.0]),
+            'to_world': mi.ScalarTransform4f().scale([paper_size_m[0]/2, paper_size_m[1]/2, 1.0]),
             'bsdf': {
                 'type': 'twosided',
                 'bsdf': {
@@ -116,7 +116,7 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
     return scene_dict
 
 
-def optimize_single_target(img_set, target_idx):
+def optimize_single_target(img_set, target_idx, downscale=2):
     # 1. Coordinate Setup
     plane_pose = np.array(img_set.get_pose()['plane_pose'])
     cam_pose = np.linalg.inv(plane_pose) @ np.diag([-1.0, -1.0, 1.0, 1.0])
@@ -124,30 +124,44 @@ def optimize_single_target(img_set, target_idx):
     # 2. Extract Depth and FOV baseline
     depth = img_set.get_focus_distance_range(target_idx)[2]
     cam_mat, dist_coeffs = load_calibration(checkerboard_single_path / "calib.json")
+    cam_mat[:2] /= downscale
     
     # 3. Load ground truth image
     photo = img_set.read_img(target_idx).astype(np.float32)/255.0
     photo_grey = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
-    photo_lin = np.power(photo_grey, 2.2)
+    photo_small = cv2.resize(photo_grey, None, fx=1/downscale, fy=1/downscale, interpolation=cv2.INTER_AREA)
+    photo_lin = np.power(photo_small, 2.2)
+    
+    #plt.imshow(photo_grey)
+    #plt.show()
 
     # 3.1 undistortion
-    h, w = photo.shape[:2]
+    h, w = photo_small.shape[:2]
     perfect_cam_mat = cam_mat.copy()
     perfect_cam_mat[:2, 2] = (w/2, h/2)
     photo_aligned = cv2.undistort(photo_lin, cam_mat, dist_coeffs, None, perfect_cam_mat)
+    
+    #plt.imshow(photo_aligned)
+    #plt.show()
     
     fx_orig = float(cam_mat[0, 0])
     fov_x_deg = np.degrees(2.0 * np.arctan(w / (2.0 * fx_orig)))
 
     # 3.2 cropping
-    mask = gen_mask(plane_pose, perfect_cam_mat, photo.shape)
+    mask = gen_mask(plane_pose, perfect_cam_mat, photo_small.shape)
     cx, cy, cw, ch = get_crop_window_from_mask(mask, padding=50)
     photo_crop = photo_aligned[cy:cy+ch, cx:cx+cw]
+    
+    #plt.imshow(mask)
+    #plt.show()
     
     # 3.3 normalization (put masked region in 0-1 range)
     low = np.min(photo_lin, initial=0, where=mask)
     high = np.max(photo_lin, initial=1, where=mask)
     photo_normalized = (photo_crop - low)/(high - low)
+    
+    #plt.imshow(photo_normalized)
+    #plt.show()
     
     ground = mi.TensorXf(np.ascontiguousarray(photo_normalized[:,:,None]))
 
@@ -158,18 +172,29 @@ def optimize_single_target(img_set, target_idx):
     params = mi.traverse(scene)
 
     # 6. Optimized Parameters Setup
-    opt_fov = dr.opt.Adam(lr=1e0)
+    epochs = 25
+    lr_fov_min, lr_fov_max = 1e-2, 5e-1
+    lr_trans_min, lr_trans_max = 1e-5, 1e-2
+    
+    opt_fov = dr.opt.Adam(lr=lr_fov_max)
     opt_fov['x_fov'] = params['sensor.x_fov']
     
-    opt_trans = dr.opt.Adam(lr=1e-2)
+    opt_trans = dr.opt.Adam(lr=lr_trans_max)
     opt_trans['tx'], opt_trans['ty'] = mi.Float(0.0), mi.Float(0.0)
     
-    base_board_transform = mi.Transform4f.scale([0.105, 0.1485, 1.0])
+    base_board_transform = mi.Transform4f.scale([float(paper_size_m[0]/2), float(paper_size_m[1]/2), 1.0])
 
     print(f"Optimizing target_idx {target_idx} | Starting FOV: {fov_x_deg:.4f}°")
 
     # 7. Optimization Loop
-    for i in range(25):
+    for i in range(epochs):
+        # apply cosine annealing
+        lr_fov = lr_fov_min + 0.5*(lr_fov_max - lr_fov_min)*(1 + math.cos(math.pi*i/epochs))
+        opt_fov.set_learning_rate(lr_fov)
+        
+        lr_trans = lr_trans_min + 0.5*(lr_trans_max - lr_trans_min) * (1 + math.cos(math.pi*i/epochs))
+        opt_trans.set_learning_rate(lr_trans)
+        
         # Apply transforms
         offset = mi.Vector3f(opt_trans['tx'], opt_trans['ty'], mi.Float(0.0))
         params['calib_board.to_world'] = mi.Transform4f.translate(offset) @ base_board_transform
@@ -223,17 +248,18 @@ def optimize_single_target(img_set, target_idx):
     }
     return result_data
 
-def main():
+def main(resume=True):
     for set_id in dot_stack_sets.keys():
         img_set = dot_stack_sets[set_id]
 
         print(f"Running optimization for {set_id}")
 
-        output_dir = optimized_calibration_path
-        output_dir.mkdir(exist_ok=True)
-
         for target_idx in range(0, img_set.count):
             depth = img_set.get_focus_distance_range(target_idx)[2]
+            output_path = optimized_calibration_path / f'calib_{set_id}_{depth}.json'
+            if output_path.exists() and resume:
+                continue
+            
             print(f"\nProcessing index {target_idx} of {img_set.count}, depth: {depth}")
             
             result_data = optimize_single_target(img_set, target_idx)
@@ -241,11 +267,12 @@ def main():
                 print("Optimization failed, skipping")
                 continue
 
-            output_path = output_dir / f'calib_{set_id}_{depth}.json'
             with open(output_path, 'w') as f:
                 json.dump(result_data, f, indent=4)
             print(f"Saved optimized matrix for depth {depth} to {output_path}")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Analysis helper for camera calibration and depth plots.')
+    
     main()

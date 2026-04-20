@@ -1,5 +1,6 @@
 import cv2 as cv
 import json
+import scipy.interpolate as inter
 from common import *
 
 class imgSet:
@@ -10,6 +11,7 @@ class imgSet:
         self.count = end - start
         self.folder = folder
         self.extension = extension
+        self.interp = None
         
     def get_img_path(self, idx):
         """Returns an image's path (as a Path object)"""
@@ -61,6 +63,36 @@ class imgSet:
         optim_path = optimized_calibration_path / f"calib_{self.id}_{depth}.json"
         
         return load_calibration(optim_path)
+    
+    def interpolate_calib(self, depth):
+        if self.interp is None:
+            data = {}
+            for i in range(self.count):
+                calib = self.get_optim_calib(i)
+                if calib is None:
+                    continue
+                K = calib[0]
+                invdepth = 1/self.get_focus_distance_range(i)[2]
+                fx = K[0,0]
+                fy = K[1,1]
+                # laziest way I could think of to de-duplicate data
+                data[invdepth] = (invdepth, fx, fy)
+                
+            data_sort = np.array(sorted(list(data.values())))
+                
+            if len(data) < 2:
+                raise ValueError("Not enough datapoints for interpolation. Come back when you're a little mmm... richer")
+            
+            self.interp = {
+                "fx": inter.CubicSpline(data_sort[:,0], data_sort[:,1], bc_type='natural'),
+                "fy": inter.CubicSpline(data_sort[:,0], data_sort[:,2], bc_type='natural')
+            }
+            
+        K, D = load_calibration(checkerboard_single_path / "calib.json")
+        K[0,0], K[1,1] = self.interp["fx"](1/depth), self.interp["fy"](1/depth)
+        
+        return (K,D)
+        
         
     def get_calib(self, idx):
         """
@@ -80,7 +112,8 @@ class imgSet:
             print(f"No calibration found for nearest depth to {target_depth}, ({closest_depth.depth})")
             return None
         return closest_depth.calibration
-        
+
+# naming convention is outer radius, inner radius, dot spacing (in mm)
 dot_stack_sets = {
     "or1_ir0_ds20": imgSet(dot_stack_path / "or1_ir0_ds20", "or1_ir0_ds20", 9702, 9723, 9735),
     "or6_ir0_ds20": imgSet(dot_stack_path / "or6_ir0_ds20", "or6_ir0_ds20", 9736, 9757, 9769),
@@ -96,5 +129,6 @@ dot_stack_sets = {
   # each set has 34 images, with the in-focus image at index 10 + first index, and the last image at index 33 + first index
     # and we have 113 sets
     # go into each directory in checkerboard & colmap/Focus Stack Calibration, and for each set, create an imgSet with the appropriate start, in_focus, and end indices
-    # the appropriate start index is the index of the first image in the set, which you read from the filename in the directory, for example for directory 1 it is "IMG_5816.JPG", for directory 2 it is "IMG_5850.JPG", and so on and there might be some missing images, so you should read the directory and find the first image and the last image, and use those indices to create the imgSet
+    # the appropriate start index is the index of the first image in the set, which you read from the filename in the directory, for example for directory 1 it is "IMG_5816.JPG", 
+    # for directory 2 it is "IMG_5850.JPG", and so on and there might be some missing images, so you should read the directory and find the first image and the last image, and use those indices to create the imgSet
     # the in-focus image is always at index 10 + start index, and the last image is always at index 33 + start index, so you can use those indices to create the imgSet

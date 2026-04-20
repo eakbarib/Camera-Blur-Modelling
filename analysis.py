@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as opt
 from imgSet import dot_stack_sets
+import scipy.interpolate as inter
 from common import *
 
 def focus_dist_curve(x, a, b, k):
@@ -95,8 +96,7 @@ def disp_focus_breathing():
     plt.tight_layout()
     plt.show()
 
-def plot_focal_vs_depth():
-    from depthGroup import depth_groups
+def plot_focal_vs_depth(show_baseline, show_interpolated):
     
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
     
@@ -119,26 +119,50 @@ def plot_focal_vs_depth():
             continue
         data_sort = np.array(sorted(data))
         
-        axs[0].plot(data_sort[:,0], data_sort[:,1], label=imgset.id)
-        axs[1].plot(data_sort[:,0], data_sort[:,2], label=imgset.id)
+        if show_interpolated:
+            x = np.linspace(np.min(data_sort[:,0]), np.max(data_sort[:,0]), 300)
+            fxs = np.zeros(len(x))
+            fys = np.zeros(len(x))
+            
+            for i in range(len(x)):
+                K = imgset.interpolate_calib(1/x[i])[0]
+                fxs[i] = K[0,0]
+                fys[i] = K[1,1]
+        
+            axs[0].plot(x, fxs, label=imgset.id)
+            axs[1].plot(x, fys, label=imgset.id)
+        else:
+            axs[0].plot(data_sort[:,0], data_sort[:,1], label=imgset.id)
+            axs[1].plot(data_sort[:,0], data_sort[:,2], label=imgset.id)
     
     # plot estimated calibrations from depth groups
-    
-    sorted_groups = sorted(depth_groups, key=lambda x: 1/x.depth)
-    
-    invdepth = []
-    fx, fy = [], []
-    
-    for group in sorted_groups:
-        calib = group.read_calibration()
-        if calib != {}:
-            invdepth.append(1/group.depth)
-            mat = np.array(calib["camera_matrix"])
-            fx.append(mat[0,0])
-            fy.append(mat[1,1])
+    if show_baseline:
+        from depthGroup import depth_groups
+        
+        sorted_groups = sorted(depth_groups, key=lambda x: 1/x.depth)
+        
+        invdepth = []
+        fx, fy = [], []
+        
+        for group in sorted_groups:
+            calib = group.read_calibration()
+            if calib != {}:
+                invdepth.append(1/group.depth)
+                mat = np.array(calib["camera_matrix"])
+                fx.append(mat[0,0])
+                fy.append(mat[1,1])
+                
+        if show_interpolated:
+            x = np.linspace(np.min(invdepth), np.max(invdepth), 300)
             
-    axs[0].plot(invdepth, fx, label="Checkerboard Stacks", color='black')
-    axs[1].plot(invdepth, fy, label="Checkerboard Stacks", color='black')
+            cx = inter.CubicSpline(invdepth, fx, bc_type='natural')
+            cy = inter.CubicSpline(invdepth, fy, bc_type='natural')
+        
+            axs[0].plot(x, cx(x), label="Checkerboard Stacks", color='black')
+            axs[1].plot(x, cy(x), label="Checkerboard Stacks", color='black')
+        else:
+            axs[0].plot(invdepth, fx, label="Checkerboard Stacks", color='black')
+            axs[1].plot(invdepth, fy, label="Checkerboard Stacks", color='black')
     
     axs[0].set_title('Focal Length $f_x$ vs Inverse Depth')
     axs[0].set_ylabel('$f_x$ (Pixels)')
@@ -158,13 +182,14 @@ def plot_focal_vs_depth():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Analysis helper for camera calibration and depth plots.')
-    parser.add_argument('--plot-focal-vs-depth', action='store_true', help='Plot fx and fy vs depth from optimized_camera_matrix JSON files.')
-    #parser.add_argument('--optim_img_group', action=, help="Set calibration pattern to display optimization curve for")
+    parser.add_argument('--optim-results', action='store_true', help='Plot fx and fy vs depth from optimized_camera_matrix JSON files.')
+    parser.add_argument('--optim-show-interpolated', action='store_true', help="Show interpolated optimized parameters")
+    parser.add_argument('--optim-show-baseline', action='store_true', help="Show baseline parameters from checkerboard stacks")
     parser.add_argument('--focus-breathing', action='store_true', help='Show focus breathing plots.')
     args = parser.parse_args()
 
-    if args.plot_focal_vs_depth:
-        plot_focal_vs_depth()
+    if args.optim_results:
+        plot_focal_vs_depth(show_baseline=args.optim_show_baseline, show_interpolated=args.optim_show_interpolated)
 
     if args.focus_breathing:
         disp_focus_breathing()
