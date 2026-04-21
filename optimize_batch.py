@@ -128,12 +128,12 @@ def optimize_single_target(img_set, target_idx, downscale=2, log_path=None):
     
     # 3. Load ground truth image
     photo = img_set.read_img(target_idx).astype(np.float32)/255.0
-    photo_grey = cv2.cvtColor(photo, cv2.COLOR_RGB2GRAY)
-    photo_small = cv2.resize(photo_grey, None, fx=1/downscale, fy=1/downscale, interpolation=cv2.INTER_AREA)
-    photo_lin = np.power(photo_small, 2.2)
+    photo_small = cv2.resize(photo, None, fx=1/downscale, fy=1/downscale, interpolation=cv2.INTER_AREA)
+    photo_grey = cv2.cvtColor(photo_small, cv2.COLOR_RGB2GRAY)
+    photo_lin = np.power(photo_grey, 2.2)
     
     if log_path is not None:
-        cv2.imwrite(log_path / "gt.png", cv2.cvtColor(photo, cv2.COLOR_RGB2BGR)*255)
+        cv2.imwrite(log_path / "gt.png", cv2.cvtColor(photo_small, cv2.COLOR_RGB2BGR)*255)
 
     # 3.1 undistortion
     h, w = photo_small.shape[:2]
