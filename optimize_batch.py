@@ -116,7 +116,7 @@ def create_mitsuba_scene(cam_pose, calib_image_path, fov_x_deg, focus_distance, 
     return scene_dict
 
 
-def optimize_single_target(img_set, target_idx, downscale=2):
+def optimize_single_target(img_set, target_idx, downscale=2, log_path=None):
     # 1. Coordinate Setup
     plane_pose = np.array(img_set.get_pose()['plane_pose'])
     cam_pose = np.linalg.inv(plane_pose) @ np.diag([-1.0, -1.0, 1.0, 1.0])
@@ -128,9 +128,12 @@ def optimize_single_target(img_set, target_idx, downscale=2):
     
     # 3. Load ground truth image
     photo = img_set.read_img(target_idx).astype(np.float32)/255.0
-    photo_grey = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
+    photo_grey = cv2.cvtColor(photo, cv2.COLOR_RGB2GRAY)
     photo_small = cv2.resize(photo_grey, None, fx=1/downscale, fy=1/downscale, interpolation=cv2.INTER_AREA)
     photo_lin = np.power(photo_small, 2.2)
+    
+    if log_path is not None:
+        cv2.imwrite(log_path / "gt.png", cv2.cvtColor(photo, cv2.COLOR_RGB2BGR)*255)
 
     # 3.1 undistortion
     h, w = photo_small.shape[:2]
@@ -147,9 +150,12 @@ def optimize_single_target(img_set, target_idx, downscale=2):
     photo_crop = photo_aligned[cy:cy+ch, cx:cx+cw]
     
     # 3.3 normalization (put masked region in 0-1 range)
-    low = np.min(photo_lin, initial=0, where=mask)
-    high = np.max(photo_lin, initial=1, where=mask)
+    low = np.min(photo_crop)
+    high = np.max(photo_crop)
     photo_normalized = (photo_crop - low)/(high - low)
+    
+    if log_path is not None:
+        cv2.imwrite(log_path / "gt_normalized.png", photo_normalized*255)
     
     ground = mi.TensorXf(np.ascontiguousarray(photo_normalized[:,:,None]))
 
@@ -192,8 +198,9 @@ def optimize_single_target(img_set, target_idx, downscale=2):
         # Render and take Loss
         render = mi.render(scene, params, seed=i, spp=4)
         loss = dr.mean(dr.square(render - ground))
-        #plt.imshow(np.array(mi.Bitmap(dr.square(render - ground))))
-        #plt.show()
+        if (i % 5 == 0 or i < 5) and log_path is not None:
+            cv2.imwrite(log_path / f"render_{i}.png", np.array(mi.Bitmap(render))*255)
+            cv2.imwrite(log_path / f"loss_{i}.png", np.array(mi.Bitmap(dr.square(render - ground)))*255)
 
         # Step
         dr.backward(loss)

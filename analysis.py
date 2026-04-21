@@ -4,7 +4,11 @@ import numpy as np
 import scipy.optimize as opt
 from imgSet import dot_stack_sets
 import scipy.interpolate as inter
+from optimize_batch import optimize_single_target
 from common import *
+
+def vis_optimization(img_set, target_idx):
+    optimize_single_target(img_set, target_idx, log_path=Path("assets/"))
 
 def focus_dist_curve(x, a, b, k):
     return k/(x - b) + a
@@ -106,7 +110,8 @@ def plot_focal_vs_depth(show_baseline, show_interpolated):
     
     # plot optimized calibrations for each pattern
     
-    for imgset in dot_stack_sets.values():
+    for setid in ["or15_ir0_ds40", "or10_ir0_ds30", "or1_ir0_ds20"]:
+        imgset = dot_stack_sets[setid]
         data = []
         for i in range(imgset.count):
             calib = imgset.get_optim_calib(i)
@@ -190,6 +195,7 @@ if __name__ == "__main__":
     parser.add_argument('--optim-show-interpolated', action='store_true', help="Show interpolated optimized parameters")
     parser.add_argument('--optim-show-baseline', action='store_true', help="Show baseline parameters from checkerboard stacks")
     parser.add_argument('--focus-breathing', action='store_true', help='Show focus breathing plots.')
+    parser.add_argument('--vis-optim', action='store_true', help='Render steps of optimization to assets.')
     args = parser.parse_args()
 
     if args.optim_results:
@@ -197,4 +203,9 @@ if __name__ == "__main__":
 
     if args.focus_breathing:
         disp_focus_breathing()
+        
+    if args.vis_optim:
+        img_set = dot_stack_sets["or10_ir0_ds30"]
+        img_idx = 8
+        vis_optimization(img_set, img_idx)
 
