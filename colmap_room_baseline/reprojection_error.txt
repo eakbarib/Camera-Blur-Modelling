@@ -1,6 +1,0 @@
-Reprojection error statistics:
-num_observations: 80398
-mean_error: 1.032098058513078
-median_error: 0.8531643396990607
-max_error: 3.996270724681221
-std_error: 0.7438443843064277
