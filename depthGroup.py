@@ -21,7 +21,7 @@ class depthGroup:
                 calibs = json.load(file)
             return calibs.get(str(self.depth), None)
         else:
-            raise Exception("Calibrations for depth groups missing. Run setup.py first.")
+            raise Exception("Calibrations for depth groups missing. Run init.py first.")
         
     def read_img(self, idx):
         """Returns an image from this depth group"""

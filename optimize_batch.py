@@ -265,6 +265,6 @@ def main(resume=True):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Analysis helper for camera calibration and depth plots.')
+    parser = argparse.ArgumentParser(description='Depth-dependent camera calibration script')
     
     main()

@@ -105,27 +105,73 @@ class colmapDB:
         if not self.colmap_exec(f"exhaustive_matcher --database_path {self.database_path}", verbose=verbose):
             raise ChildProcessError("Failed to extract features.")
         
-    def reconstruct(self, output_path, verbose=False):
-        self.output_path = output_path
-        
+    def reconstruct_sparse(self, output_path, verbose=False, refine=False):
         if output_path.exists():
             if self.del_existing:
                 shutil.rmtree(output_path)
             else:
+                self.output_path = output_path
                 return
         
         if self.image_path is None:
             raise Exception("No images added")
         
+        self.output_path = output_path
         output_path.mkdir(exist_ok=True)
         
-        self.colmap_exec(f"mapper --database_path {self.database_path} --image_path {self.image_path} --output_path {output_path}"
-            " --Mapper.ba_refine_focal_length 0 --Mapper.ba_refine_principal_point 0 --Mapper.ba_refine_extra_params 0", verbose=verbose)
-    
-    def print_summary(self):
+        self.colmap_exec(f"mapper --database_path {self.database_path} --image_path {self.image_path} --output_path {output_path}{
+                " --Mapper.ba_refine_focal_length 0 --Mapper.ba_refine_principal_point 0 --Mapper.ba_refine_extra_params 0" if not refine else ""
+            }", 
+            verbose=verbose
+        )
+        
+    def sparse_reproj_error(self):
         if self.output_path is None:
             raise Exception("Reconstruction not created yet. Run reconstruct() first")
         
+        reproj_errors = []
+        
         for reconstruction_path in self.output_path.iterdir():
             reconstruction = pycolmap.Reconstruction(reconstruction_path)
-            print(reconstruction.summary())
+            reproj_errors.append(reconstruction.compute_mean_reprojection_error())
+        
+        return np.mean(reproj_errors)
+        
+    def reconstruct_dense(self, dense_output_path, verbose=False):        
+        if dense_output_path.exists():
+            if self.del_existing:
+                shutil.rmtree(dense_output_path)
+            else:
+                self.dense_output_path = dense_output_path
+                return
+            
+        if self.image_path is None:
+            raise Exception("No images added")
+        
+        if self.output_path is None:
+            raise Exception("No sparse reconstruction created")
+        
+        self.dense_output_path = dense_output_path
+        dense_output_path.mkdir(exist_ok=True)
+        
+        self.colmap_exec(
+            f"image_undistorter --image_path {self.image_path} --input_path {self.output_path / '0'} --output_path {self.dense_output_path}", 
+            verbose=verbose
+        )
+        
+        self.colmap_exec(
+            f"patch_match_stereo --workspace_path {self.dense_output_path}"
+            " --PatchMatchStereo.max_image_size 1080", 
+            verbose=verbose
+        )
+        
+        self.colmap_exec(
+            f"stereo_fusion --workspace_path {self.dense_output_path} --output_path {self.dense_output_path / "fused.ply"}", 
+            verbose=verbose
+        )
+        
+        self.colmap_exec(
+            f"poisson_mesher --input_path {self.dense_output_path / "fused.ply"} --output_path {self.dense_output_path / "meshed.ply"}", 
+            verbose=verbose
+        )
+        
