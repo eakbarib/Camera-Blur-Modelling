@@ -65,7 +65,7 @@ Also pass `--calibrate-do-stacks` if you plan on running `analysis.py` later.
 
 #### Depth-Dependent Camera Calibration
 
-Run `py optimize_batch.py`
+Run `py optimize_batch.py`\
 **Note: this uses a Cuda variant of Mitsuba, so a compatible Nvidia gpu is required.
 
 ## Analysis
