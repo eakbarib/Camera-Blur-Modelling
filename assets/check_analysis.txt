@@ -1,0 +1,3 @@
+focal length exhibits a clear trend -> model dependence on depth
+principal point appears to be mostly stationary -> assumed constant
+distortion parameters are very noisy and seem to fluctuate about a constant value -> assumed constant

@@ -1,0 +1,29 @@
+pattern results:
+dots performed significantly better than hoops
+tightly packed objects performed poorly
+
+Patterns classified based on similarity to trend observed in checkerboard photos (qualitative):
+
+good:
+or15_ir0_ds40
+ - large dots
+or10_ir0_ds30
+ - med dots
+or1_ir0_ds20
+ - very small dots
+
+mid:
+or10_ir5_ds30
+ - med hoops
+or6_ir0_ds20
+ - small dots
+or15_ir7_ds40
+ - large hoops
+
+bad:
+or10_ir1_ds20
+ - tightly packed hoops
+or10_ir2_ds20
+ - tightly packed hoops
+or6_ir3_ds20
+ - small hoops

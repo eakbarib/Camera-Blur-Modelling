@@ -72,61 +72,33 @@ def disp_focus_breathing():
     plt.show()
 
     # Figure 2 
-    fig2, axs = plt.subplots(2, 2, figsize=(12, 10))
+    fig2, axs = plt.subplots(1, 2, figsize=(12, 10))
     
-    axs[0, 0].plot(depth, k1, marker='o', color='blue')
-    axs[0, 0].set_title('Radial Distortion $k_1$ vs Inverse Depth')
+    axs[0].plot(depth, k1, marker='o', color='blue')
+    axs[0].set_title('Radial Distortion $k_1$ vs Inverse Depth')
     
-    axs[0, 1].plot(depth, k2, marker='s', color='orange')
-    axs[0, 1].set_title('Radial Distortion $k_2$ vs Inverse Depth')
-
-    axs[1, 0].plot(depth, k3, marker='^', color='green')
-    axs[1, 0].set_title('Radial Distortion $k_3$ vs Inverse Depth')
-
-    axs[1, 1].plot(depth, p1, marker='d', label='$p_1$')
-    axs[1, 1].plot(depth, p2, marker='x', label='$p_2$')
-    axs[1, 1].set_title('Tangential Distortion $p_1, p_2$ vs Inverse Depth')
-    axs[1, 1].legend()
-
+    axs[1].plot(depth, k2, marker='s', color='orange')
+    axs[1].set_title('Radial Distortion $k_2$ vs Inverse Depth')
+    
     for ax in axs.flat:
         ax.set_xlabel('Inverse Depth')
         ax.set_ylabel('Coefficient Value')
         ax.grid(True)
+    
+    # Figure 3 
+    fig3, ax = plt.subplots()
+
+    ax.plot(depth, p1, marker='d', label='$p_1$')
+    ax.plot(depth, p2, marker='x', label='$p_2$')
+    ax.set_title('Tangential Distortion $p_1, p_2$ vs Inverse Depth')
+    ax.legend()
+
+    ax.set_xlabel('Inverse Depth')
+    ax.set_ylabel('Coefficient Value')
+    ax.grid(True)
 
     plt.tight_layout()
     plt.show()
-    
-"""
-pattern results:
-dots performed significantly better than hoops
-tightly packed objects performed poorly
-
-todo: run colmap for good patterns to decide which is the best overall
-
-good:
-or15_ir0_ds40
- - large dots
-or10_ir0_ds30
- - med dots
-or1_ir0_ds20
- - very small dots
-
-mid:
-or10_ir5_ds30
- - med hoops
-or6_ir0_ds20
- - small dots
-or15_ir7_ds40
- - large hoops
-
-bad:
-or10_ir1_ds20
- - tightly packed hoops
-or10_ir2_ds20
- - tightly packed hoops
-or6_ir3_ds20
- - small hoops
-"""
 
 def plot_focal_vs_depth(show_baseline, show_interpolated):
     
