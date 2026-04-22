@@ -1,0 +1,9 @@
+Reprojection Error
+
+Model                                     | Tabletop | Room
+------------------------------------------|----------|-------------
+Single Camera Free Intrinsics             | 0.9525   | 0.8087
+Single Camera Fixed Intrinsics            | 0.9447   | 0.7852
+Depth Dependent Camera From or15_ir0_ds40 | 0.9329   | 0.7564
+Depth Dependent Camera From or10_ir0_ds30 | 0.9250   | 0.7362
+Depth Dependent Camera From or1_ir0_ds20  | 0.9337   | 0.7809
